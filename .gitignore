@@ -16,3 +16,4 @@ reports/
 *.zip
 .env
 .DS_Store
+native/rust/target/
