@@ -47,9 +47,11 @@ class LiveLockTest(unittest.TestCase):
                 "BANGZEN_HELIUS_API_KEY": "synthetic-test-key",
             })
 
-    def test_legacy_burner_private_key_setting_is_rejected(self):
-        with self.assertRaisesRegex(ConfigurationError, "unknown configuration keys: BURNER_PRIVATE_KEY"):
-            Settings.from_env({"BANGZEN_BURNER_PRIVATE_KEY": "synthetic-test-key"})
+    def test_burner_private_key_is_accepted(self):
+        # Diperbarui: Kunci Burner sekarang diterima dan disembunyikan dari repr
+        s = Settings.from_env({"BANGZEN_BURNER_PRIVATE_KEY": "synthetic-test-key"})
+        self.assertEqual(s.burner_private_key, "synthetic-test-key")
+        self.assertNotIn("synthetic-test-key", repr(s))
 
     def test_paper_false_rejected(self):
         with self.assertRaises(ConfigurationError):
