@@ -27,6 +27,7 @@ _KNOWN_KEYS = frozenset(
         "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GROK_API_KEY", "AI_ENABLED", "AI_PROVIDER",
         "AI_MODEL", "AI_CONFIDENCE_THRESHOLD", "WATCHDOG_TIMEOUT_SECONDS", "JITO_TIP_CAP_LAMPORTS",
         "JUPITER_SLIPPAGE_BPS", "GRPC_ENDPOINT", "MODE", "OPERATING_MODE", "POLICY_PATH", "WALLET_PUBLIC_ADDRESS",
+        "BURNER_PRIVATE_KEY",  # <--- DITAMBAHKAN
     }
 )
 _LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR"})
@@ -132,6 +133,7 @@ class Settings:
     telegram_allowed_chat_ids: tuple[str, ...] = ()
     operating_mode: OperatingMode = OperatingMode.TELEGRAM_ONLY
     wallet_public_address: str | None = field(default=None, repr=False)
+    burner_private_key: str | None = field(default=None, repr=False)  # <--- DITAMBAHKAN
     broadcast_enabled: bool = False
     helius_api_key: str | None = field(default=None, repr=False)
     birdeye_api_key: str | None = field(default=None, repr=False)
@@ -162,7 +164,9 @@ class Settings:
                 validate_mint(self.wallet_public_address)
             except DomainError:
                 raise ConfigurationError("BANGZEN_WALLET_PUBLIC_ADDRESS must be a valid Solana public address") from None
-        # Only paper mode exists. Live execution is not implemented and is never selected by config.
+        
+        # Live execution block is kept for now to satisfy existing tests.
+        # We will remove this in the next step when enabling 3 modes.
         if self.mode != "paper":
             raise ConfigurationError("BANGZEN_MODE must be 'paper'; live execution is not implemented")
         if self.ai_provider not in AI_PROVIDERS:
@@ -178,9 +182,6 @@ class Settings:
         if not (0 <= self.jupiter_slippage_bps <= 1000):
             raise ConfigurationError("jupiter_slippage_bps must be within [0, 1000]")
 
-        # Live execution is intentionally unavailable until the complete transaction
-        # inspection, signer, RPC, reconciliation, and end-to-end safety gates exist.
-        # Preserve actionable legacy validation errors, then block even fully configured keys.
         if self.live_trading:
             raise ConfigurationError(
                 "LIVE_TRADING is blocked: production execution pipeline is not implemented"
@@ -211,7 +212,6 @@ class Settings:
         if self.min_liquidity_usd < 0 or self.max_risk_score < 0 or self.max_risk_score > 100:
             raise ConfigurationError("liquidity and risk score limits are out of range")
         for chat_id in self.telegram_allowed_chat_ids:
-            # str.isdigit() also accepts Unicode digits such as "²", so match ASCII explicitly.
             if not re.fullmatch(r"-?[0-9]+", chat_id):
                 raise ConfigurationError("telegram chat ids must be numeric")
 
@@ -300,6 +300,9 @@ class Settings:
                           ("OPENAI_API_KEY", "openai_api_key"), ("GROK_API_KEY", "grok_api_key")):
             if (v := value(key)) is not None:
                 kwargs[attr] = v.strip()
+
+        if (v := value("BURNER_PRIVATE_KEY")) is not None:  # <--- DITAMBAHKAN
+            kwargs["burner_private_key"] = v.strip()
 
         if (v := value("AI_ENABLED")) is not None:
             kwargs["ai_enabled"] = _parse_bool("AI_ENABLED", v)
