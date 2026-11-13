@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "phases": {
+    "UNKNOWN":    {"mode": "WATCH",        "required": ["safety", "holders"]},
+    "LAUNCH":     {"mode": "WATCH",        "required": ["safety", "holders"]},
+    "EARLY":      {"mode": "ENTER_PAPER",  "required": ["safety", "holders", "ai", "liquidity", "intel"]},
+    "GROWTH":     {"mode": "ENTER_PAPER",  "required": ["safety", "holders", "ai", "liquidity", "volume", "intel"]},
+    "MATURE":     {"mode": "ENTER_PAPER",  "required": ["safety", "holders", "ai", "liquidity", "volume", "intel"]},
+    "CEX_LISTED": {"mode": "WATCH",        "required": ["safety", "holders"]}
+  }
+}

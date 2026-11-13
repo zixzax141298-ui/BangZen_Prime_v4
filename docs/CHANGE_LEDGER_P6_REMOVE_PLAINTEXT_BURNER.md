@@ -1,0 +1,26 @@
+# Change Ledger — P6 Remove Plaintext Burner Wallet
+
+- Objective: remove the unencrypted local burner wallet and unaudited custom Ed25519 signer rather than preserve a parallel signing path.
+- Base branch: `main`
+- Base SHA: `9e2c36cc61ff3da0822325fe2afc1df9fbcf7378`
+- Head SHA: recorded by GitHub after the final PR commit; verify from PR metadata.
+- Files removed:
+  - `bangzen_prime/infrastructure/adapters/execution/burner_wallet.py`
+  - `bangzen_prime/infrastructure/adapters/execution/ed25519.py`
+- Legacy secret configuration removed:
+  - `BANGZEN_BURNER_PRIVATE_KEY` is no longer accepted, stored in `Settings`, or used as a live-trading prerequisite.
+- Files added:
+  - `docs/decisions/ADR-0002-remove-local-plaintext-burner.md`
+  - `tests/unit/test_removed_burner_wallet.py`
+  - `tests/unit/test_settings.py` (updated to reject the legacy burner key setting)
+  - `bangzen_prime/settings.py` (removed the key field, parser, and prerequisite)
+  - `docs/CONFIGURATION.md` (documents local `.env` cleanup)
+  - `docs/CHANGE_LEDGER_P6_REMOVE_PLAINTEXT_BURNER.md`
+- Compatibility: removes the experimental burner-wallet API; no production execution flow should depend on it. Existing fail-closed `WalletSigner` shim and keyless wallet diagnostics are retained.
+- Security: plaintext seed persistence and the project-local signing primitive are removed. No replacement signer, key import, transaction signing, or broadcast capability is added.
+- Tests: NOT RUN by this authoring session; intended command: `python -m unittest tests.unit.test_removed_burner_wallet tests.unit.test_legacy_signer_lock`.
+- CI: `python3 tools/ci.py` NOT RUN in this session.
+- Static/security scans: NOT RUN.
+- Known limitation: this PR does not implement a secure wallet. It deliberately leaves wallet creation, custody, signing, and live execution locked.
+- Rollback: reverting the deletion would restore an unsafe plaintext signing path; do not roll back without a replacement security design and owner approval.
+- Merge: not merged; owner review required.

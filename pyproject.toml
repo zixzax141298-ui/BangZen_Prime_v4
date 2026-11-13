@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bangzen-prime"
+version = "0.3.0"
+description = "Solana token intelligence: discovery, safety audit, scoring, signal-only alerts, paper execution. Live trading locked."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+bangzen-prime = "bangzen_prime.__main__:main"
+
+[project.optional-dependencies]
+# Runtime extras are installed only for features that need them.
+dashboard = ["httpx>=0.27", "rich>=13", "python-dotenv>=1.0", "pyfiglet>=1.0"]
+intel = ["httpx>=0.27", "defusedxml>=0.7"]
+ws = ["websockets>=12"]
+wallet = ["base58>=2.1", "solders>=0.21"]
+
+# Portable developer tools; keep native/container scanners out of this group.
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "coverage",
+    "ruff",
+    "black",
+    "mypy",
+    "defusedxml>=0.7",
+]
+
+# Additional security tooling for supported VPS/Linux and CI environments.
+security = [
+    "bandit",
+    "semgrep",
+    "pip-audit",
+]
+
+# Supplemental scanner only; no Safety API key is required by the core gate.
+safety = ["safety>=3.0"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["bangzen_prime*"]
+
+[tool.setuptools.package-data]
+"bangzen_prime.infrastructure.migrations" = ["*.sql"]

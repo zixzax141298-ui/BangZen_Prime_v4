@@ -1,0 +1,76 @@
+{
+  "schema_version": "2.0",
+  "selection_policy": {
+    "purpose": "ANALYSIS_ONLY",
+    "max_selected_weapons": 1,
+    "invoke_only_when_triggered": true,
+    "catalog_is_not_a_mandatory_checklist": true,
+    "empty_selection_allowed": true,
+    "require_validated_evidence": true,
+    "if_evidence_missing_partial_stale_or_conflicted": "DO_NOT_INVOKE; REPORT_UNCERTAIN",
+    "weapon_output_is_advisory_analysis_only": true
+  },
+  "capability_boundary": {
+    "ai_manager_may": "Inspect validated evidence, identify suspicious patterns or uncertainty, and request at most one relevant analysis weapon.",
+    "ai_manager_must_not": [
+      "manage balances or funds",
+      "calculate position sizing or financial exposure",
+      "create buy or sell plans",
+      "set TP, SL, slippage, or TWAP",
+      "authorize, construct, sign, submit, or broadcast transactions",
+      "make final trading or financial decisions"
+    ],
+    "forbidden_tool_ids": [
+      "evaluate_pumpfun_raydium",
+      "get_session_multiplier",
+      "calculate_twap_plan",
+      "get_dynamic_slippage"
+    ]
+  },
+  "scenarios": {
+    "SUSPICIOUS_EARLY": {
+      "trigger": "Validated early-token evidence contains concentration, coordinated-funding, developer-history, or transaction-timing anomalies.",
+      "candidate_weapons": [
+        "check_sybil_cluster",
+        "check_sequential_bundle",
+        "check_autopsy_dna"
+      ],
+      "selection_rule": "Choose at most one weapon that best investigates the strongest validated anomaly. Never call all candidates."
+    },
+    "UNCERTAIN_OR_CONFLICTED_HISTORY": {
+      "trigger": "Historical coverage is incomplete, stale, unavailable, or contradictory.",
+      "candidate_weapons": [
+        "check_sybil_cluster",
+        "check_sequential_bundle",
+        "check_autopsy_dna"
+      ],
+      "selection_rule": "Call one weapon only if it can resolve a specific testable uncertainty; otherwise return UNAVAILABLE/UNCERTAIN without a call."
+    },
+    "POSITIVE_EVIDENCE_NEEDS_CONFIRMATION": {
+      "trigger": "Validated evidence is favorable but one material claim needs independent analysis.",
+      "candidate_weapons": [
+        "check_smart_money_quality",
+        "check_honeypot",
+        "score_metadata_narrative",
+        "check_cross_chain_copycat"
+      ],
+      "selection_rule": "Choose one weapon to verify the highest-impact unconfirmed claim. Prefer on-chain evidence over narrative-only evidence."
+    },
+    "DOWNSIDE_OR_DISTRIBUTION_WARNING": {
+      "trigger": "Validated evidence shows liquidity deterioration, developer selling, unusual sell velocity, or suspicious distribution.",
+      "candidate_weapons": [
+        "check_pre_dump_radar",
+        "check_sybil_cluster"
+      ],
+      "selection_rule": "Choose one weapon that best investigates the warning. Never interpret its output as a sell instruction."
+    },
+    "MATURE_OR_REVIVAL_PATTERN": {
+      "trigger": "A mature or previously inactive token shows a validated change in activity, wallet quality, or market participation.",
+      "candidate_weapons": [
+        "check_smart_money_quality",
+        "fetch_news_keywords"
+      ],
+      "selection_rule": "Choose one weapon only when its inputs exist and its result can materially reduce uncertainty."
+    }
+  }
+}

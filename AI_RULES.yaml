@@ -1,0 +1,221 @@
+schema_version: "1.0"
+project:
+  name: "BANGZEN PRIME"
+  constitution_version: "13.0"
+  purpose: "Solana token intelligence, risk-aware signal generation, and paper-trading research."
+  objective: "Maximize evidence-backed net expectancy while controlling drawdown; never promise profit."
+  network: "Solana"
+  default_operating_mode: "read_only_and_paper"
+
+authority:
+  precedence:
+    - "AI_RULES.yaml"
+    - "SECURITY.md"
+    - "RULES.md"
+    - "AGENTS.md"
+    - "docs/architecture/*"
+    - "docs/*"
+    - "code_and_tests"
+  conflict_policy: "Stop the affected work, report the conflict, and request owner clarification. Never silently weaken a higher-level rule."
+  owner_approval_required_for:
+    - "Enabling live trading, signing, or transaction broadcast"
+    - "Changing risk limits, safety thresholds, or emergency-stop semantics"
+    - "Changing the evidence contract or AI decision authority"
+    - "Adding a secret-bearing provider or wallet capability"
+    - "Deleting, bypassing, or materially weakening tests or security controls"
+
+operating_modes:
+  read_only:
+    allowed: ["Market data reads", "Chain data reads", "Evidence validation", "Alerts"]
+    transaction_signing: false
+    transaction_broadcast: false
+  paper:
+    allowed: ["Simulated orders", "Simulated fills", "Fee and slippage modelling", "Position lifecycle tests"]
+    transaction_signing: false
+    transaction_broadcast: false
+  live:
+    enabled: false
+    default: false
+    requires:
+      - "Explicit written owner authorization for the specific change"
+      - "Independent security review"
+      - "Risk and execution tests with documented evidence"
+      - "Verified transaction simulation and reconciliation"
+      - "A tested emergency-stop and rollback procedure"
+      - "A separate approved implementation PR"
+    note: "No implementation or configuration may infer live authorization from a general request to improve the bot."
+
+non_negotiable_safety:
+  fail_closed: true
+  missing_or_stale_data: "UNAVAILABLE"
+  contradictory_sources: "CONFLICTED"
+  insufficient_evidence_decision: "HOLD"
+  ai_can_override_risk_veto: false
+  ai_can_access_secrets: false
+  ai_can_sign_transactions: false
+  ai_can_broadcast_transactions: false
+  private_key_or_seed_phrase_in_repository: forbidden
+  secrets_in_logs_or_telegram: forbidden
+  disabling_security_checks_to_increase_signal_count: forbidden
+  bypassing_halt_flag_or_emergency_stop: forbidden
+  fabricated_test_or_ci_claims: forbidden
+
+architecture:
+  principles:
+    - "Domain logic has no network or persistence side effects."
+    - "Application orchestration depends on ports, not concrete providers."
+    - "Infrastructure adapters own external I/O and secret handling."
+    - "bootstrap.py is the composition root."
+    - "Risk and Safety is deterministic, isolated, and has final veto."
+    - "AI Manager consumes validated, versioned evidence only."
+    - "Provider data is untrusted input until validated and normalized."
+  responsibilities:
+    ai_manager:
+      may: ["Summarize validated evidence", "Rank eligible strategies", "Select one permitted defensive or analysis module", "Return a schema-valid recommendation with reason codes"]
+      may_not: ["Invent missing facts", "Change risk policy", "Access provider credentials", "Sign or broadcast transactions", "Override a deterministic veto"]
+    data_gateway:
+      owns: ["Provider adapters", "Credential injection", "Rate limits", "Retries", "Timeouts", "Caching", "Source provenance"]
+      ai_direct_access: false
+    risk_safety:
+      owns: ["Hard safety gates", "Exposure limits", "Net-risk calculation", "Emergency stop", "Final veto"]
+      ai_mutable: false
+    execution:
+      current_scope: "Read-only and simulated execution only"
+      live_scope: "Locked pending separate owner approval"
+
+evidence_contract:
+  required_fields:
+    - "schema_version"
+    - "subject"
+    - "observed_at"
+    - "received_at"
+    - "source"
+    - "source_record_id"
+    - "freshness"
+    - "completeness"
+    - "validation_status"
+    - "confidence_basis"
+    - "reason_codes"
+  allowed_validation_status:
+    - "VERIFIED"
+    - "PARTIAL"
+    - "UNAVAILABLE"
+    - "CONFLICTED"
+    - "REJECTED"
+  rules:
+    - "A provider response is an observation, not proof of safety."
+    - "PARTIAL, UNAVAILABLE, CONFLICTED, or REJECTED evidence cannot satisfy a hard safety gate."
+    - "Historical coverage must state address scope, time scope, pagination state, provider, and known gaps."
+    - "EXHAUSTED pagination is not proof of complete blockchain or token history."
+    - "Never treat missing values as zero, false, safe, or passed."
+    - "Every decision must be reproducible from stored evidence and policy version where practical."
+
+ai_decision_contract:
+  allowed_actions: ["BUY_CANDIDATE", "HOLD", "SKIP"]
+  default_action: "HOLD"
+  required_output:
+    - "decision_id"
+    - "schema_version"
+    - "subject"
+    - "action"
+    - "selected_weapon"
+    - "evidence_refs"
+    - "risk_flags"
+    - "reason_codes"
+    - "data_quality"
+    - "policy_version"
+    - "created_at"
+  weapon_selection:
+    maximum_selected_weapons: 1
+    must_be_registered_and_allowlisted: true
+    selection_basis: "Validated evidence and declared module capability"
+    unavailable_evidence_behavior: "HOLD"
+    execution_authority: false
+  note: "A BUY_CANDIDATE is an analytical recommendation, not authorization to submit an order."
+
+risk_policy:
+  authority: "Deterministic Risk/Safety module"
+  veto_is_final: true
+  net_risk_must_include:
+    - "Entry and exit fees"
+    - "Expected slippage"
+    - "Price impact"
+    - "Priority or tip costs when applicable"
+    - "Partial-fill and failed-exit assumptions"
+  thresholds_change_requires: "Owner approval, rationale, tests, and a Change Ledger entry."
+  no_guaranteed_profit_claims: true
+
+engineering:
+  change_policy:
+    - "One coherent objective per pull request."
+    - "Prefer additive, reversible changes."
+    - "Do not overwrite production behavior without explicit scope."
+    - "Do not combine governance, strategy, and execution changes in one PR."
+    - "Preserve backward compatibility unless migration is explicitly approved."
+  testing:
+    required: true
+    preserve_existing_tests: true
+    no_test_weakening: true
+    report_actual_commands_and_results: true
+    required_gate: "python3 tools/ci.py"
+    done_definition: "Do not call a change DONE until the required gate is fully green and evidence is recorded. If tools/ci.py is absent or cannot run, report BLOCKED/NOT RUN, never PASS."
+  security:
+    dependency_changes_require_review: true
+    static_analysis_required_when_available: true
+    secret_scan_required: true
+  auditability:
+    change_ledger_required: true
+    record_base_and_head_sha: true
+    record_tests_and_unrun_checks: true
+    record_known_limitations: true
+
+repository_layout:
+  root_policy_files:
+    - "AI_RULES.yaml"
+    - "RULES.md"
+    - "AGENTS.md"
+    - "SECURITY.md"
+  source_of_truth:
+    domain: "bangzen_prime/domain"
+    application: "bangzen_prime/application"
+    infrastructure: "bangzen_prime/infrastructure"
+    execution: "bangzen_prime/execution"
+    interfaces: "bangzen_prime/interfaces"
+    composition_root: "bangzen_prime/bootstrap.py"
+  supporting:
+    configuration: "config"
+    tests: "tests"
+    scripts: "scripts"
+    documentation: "docs"
+    native_acceleration: "native"
+    reports: "reports"
+  placement_rules:
+    - "Do not create a second implementation of an existing domain capability in a different layer."
+    - "Provider-specific code belongs in infrastructure/adapters."
+    - "Pure deterministic policy belongs in domain or the dedicated risk boundary."
+    - "Tests mirror the production package/layer they validate."
+    - "Operational procedures belong in docs/runbooks; architecture decisions belong in docs/decisions."
+    - "Do not move existing paths without a dedicated migration PR."
+
+release_controls:
+  pull_request_required: true
+  merge_requires_owner_approval: true
+  live_release_requires_separate_approval: true
+  release_notes_and_change_ledger_required: true
+  rollback_plan_required_for: ["Database migrations", "Execution changes", "Risk policy changes", "Provider contract changes"]
+
+incident_response:
+  immediate_actions:
+    - "Stop new actions using the affected capability."
+    - "Activate the documented emergency stop when trading or data integrity may be at risk."
+    - "Preserve logs and audit records while redacting secrets."
+    - "Do not retry unknown transaction outcomes blindly."
+    - "Escalate to the owner with impact, evidence, and containment steps."
+
+status_vocabulary:
+  PASS: "The exact check was run and passed."
+  FAIL: "The exact check was run and failed."
+  NOT_RUN: "The check was not executed."
+  BLOCKED: "The check could not execute because a prerequisite was unavailable."
+  UNAVAILABLE: "Required evidence is missing, stale, or inaccessible."
+  PARTIAL: "Some but not all required evidence is available."

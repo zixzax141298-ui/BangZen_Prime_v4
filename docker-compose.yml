@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  bangzen-prime:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: bangzen-prime-bot
+    restart: unless-stopped
+    
+    # Memuat variabel dari file .env (API Keys, AI, dll)
+    env_file:
+      - .env
+      
+    # Batasi resource agar VPS tidak hang (Opsional, sesuaikan dengan spek VPS)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+          
+    # Mount volume untuk menyimpan log atau database (jika ada)
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      
+    # Logging configuration agar file log tidak membengkak
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        
+    # Jika bot Anda berupa daemon/worker, ganti command-nya di sini:
+    # command: python -m bangzen_prime daemon

@@ -1,0 +1,21 @@
+# Change Ledger — P5 Operating Mode and Execution Kill Switch
+
+- Objective: add an explicit three-mode contract and a fail-closed execution kill switch.
+- Base branch: `main`
+- Base SHA: `5a5ca5adab96373237627e253af96232600a6fc4`
+- Head SHA: recorded in the GitHub PR metadata (the ledger cannot contain its own final commit SHA).
+- Files:
+  - `bangzen_prime/domain/operating_mode.py`
+  - `bangzen_prime/application/mode_controller.py`
+  - `tests/unit/test_operating_mode.py`
+  - `docs/OPERATING_MODES_AND_EXECUTION_LOCK.md`
+  - `docs/CHANGE_LEDGER_P5_OPERATING_MODE.md`
+- Compatibility: additive; no existing API or persisted schema changed.
+- Security: defaults to Telegram-only and kill-switch engaged; no wallet/key/signer/RPC/transaction capability added; effective wallet access remains denied in all modes.
+- Funding note: the application cannot prevent an on-chain deposit to a public address. It can and must deny bot-side signer access while Telegram-only or while execution remains locked.
+- Tests: NOT RUN in the authoring environment. Intended command: `python -m unittest tests.unit.test_operating_mode`.
+- CI: `python3 tools/ci.py` NOT RUN; no claim of PASS.
+- Static/security checks: NOT RUN.
+- Known limitation: controller is an isolated policy component and is not yet wired into bootstrap, Telegram delivery, or an execution adapter. This avoids silently changing existing production behavior in this focused PR.
+- Live execution: remains locked by `AI_RULES.yaml`, `SECURITY.md`, and `RULES.md`.
+- Rollback: revert this PR; no migration or persistent side effect.
