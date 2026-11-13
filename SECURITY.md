@@ -4,7 +4,7 @@ This is the repository-level security policy. It defines mandatory security boun
 
 ## 1. Security objectives
 
-Protect funds, credentials, data integrity, decision integrity, availability, and auditability. The default system is read-only and paper-only. Security controls must not be weakened to improve speed, signal volume, or convenience.
+Protect funds, credentials, data integrity, decision integrity, availability, and auditability. The default system is read-only and paper-only (`TELEGRAM_ONLY`). Security controls must not be weakened to improve speed, signal volume, or convenience.
 
 ## 2. Threat model
 
@@ -15,25 +15,28 @@ Assume the system may encounter:
 - Provider outages, rate limits, timeouts, replay gaps, and partial historical coverage.
 - Prompt injection or hostile instructions embedded in token metadata, websites, RPC data, logs, model output, and repository content.
 - Dependency compromise, accidental secret disclosure, database corruption, and process crashes.
-- Unknown transaction outcomes and failed or partial execution in any future execution-enabled design.
+- Unknown transaction outcomes and failed or partial execution in any execution-enabled design.
 
-## 3. Execution boundary
+## 3. Execution boundary (3 Modes)
 
-- Live trading is disabled by default and remains locked in the current scope.
-- Transaction signing and broadcast are disabled. No private key, seed phrase, or wallet signing secret may be stored in this repository.
-- AI must never hold signing authority, transaction-broadcast authority, or wallet secrets.
-- A future live-execution proposal requires explicit owner approval, separate PRs, independent security review, deterministic risk approval, simulation, reconciliation, emergency-stop validation, and rollback procedures.
+- **Default Mode:** `TELEGRAM_ONLY` (Read-only & Signal-only). Live trading, signing, and broadcast are disabled in this mode.
+- **Conditional Execution:** Modes `EXECUTION_ONLY` and `HYBRID` allow transaction signing and broadcast. However, this is STRICTLY gated by:
+  1. `BANGZEN_LIVE_TRADING=true` in the environment.
+  2. A valid `BURNER_PRIVATE_KEY` provided via `.env`.
+  3. The `SecureExecutionGateway` validating the order.
+- No private key, seed phrase, or wallet signing secret may be stored in this repository. It must only be loaded via `.env`.
+- AI must never hold signing authority, transaction-broadcast authority, or wallet secrets. AI decisions are advisory; execution is handled by the `ExecutionUseCase`.
 - Jupiter, Jito, or any execution provider must not be treated as a substitute for independent position/risk management or as a guarantee of execution price, fill, or profit.
 
 ## 4. Secret management
 
-- Store credentials only in approved secret storage or untracked environment configuration.
-- Keep `.env`, private keys, seed phrases, access tokens, API keys, and production credentials out of git history, issue comments, test fixtures, screenshots, logs, and Telegram messages.
+- Store credentials only in approved secret storage or untracked environment configuration (`.env`).
+- Keep `.env`, private keys (including `BURNER_PRIVATE_KEY`), seed phrases, access tokens, API keys, and production credentials out of git history, issue comments, test fixtures, screenshots, logs, and Telegram messages.
 - Use least-privilege credentials and separate development/test/production credentials.
-- Inject secrets only into the provider adapter that needs them. Do not pass secrets into AI prompts or general application state.
+- Inject secrets only into the provider adapter or signer that needs them. Do not pass secrets into AI prompts or general application state.
 - Redact secrets from URLs, exception messages, `repr`, traces, telemetry, and support bundles.
 - Rotate exposed credentials immediately and review access logs where available.
-- `.env.example` must contain placeholders only.
+- `.env.example` must contain placeholders only (empty values).
 
 ## 5. Data and AI security
 
@@ -76,7 +79,7 @@ Assume the system may encounter:
 
 ## 9. Development and dependency security
 
-- Keep dependencies minimal and pinned/ constrained according to project policy.
+- Keep dependencies minimal and pinned/constrained according to project policy.
 - Review dependency changes for maintenance, licensing, vulnerabilities, and transitive impact.
 - Run available static analysis, secret scanning, dependency auditing, and tests.
 - Never weaken tests, CI, scanners, or policy checks to make a PR green.
@@ -101,4 +104,4 @@ Report suspected vulnerabilities privately to the repository owner. Do not publi
 
 ## 12. Current known boundary
 
-The existence of provider adapters, simulated execution code, or configuration keys does not mean live trading is authorized. Current operating mode remains read-only/paper; signing and broadcast remain locked.
+The default operating mode is `TELEGRAM_ONLY` (read-only and paper-only). Enabling `EXECUTION_ONLY` or `HYBRID` requires explicit `.env` configuration (`BANGZEN_LIVE_TRADING=true` and `BANGZEN_BURNER_PRIVATE_KEY`). Signing and broadcast remain strictly gated by the `SecureExecutionGateway` and `ExecutionUseCase`.
