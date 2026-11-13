@@ -1,11 +1,44 @@
 schema_version: "1.0"
 project:
   name: "BANGZEN PRIME"
-  constitution_version: "13.0"
-  purpose: "Solana token intelligence, risk-aware signal generation, and paper-trading research."
+  constitution_version: "14.0"
+  purpose: "Solana token intelligence, risk-aware signal generation, and automated execution."
   objective: "Maximize evidence-backed net expectancy while controlling drawdown; never promise profit."
   network: "Solana"
-  default_operating_mode: "read_only_and_paper"
+  default_operating_mode: "TELEGRAM_ONLY"
+
+# ==============================================================================
+# PILAR UTAMA AI AGENT (AI AGENT PILLARS & PROTOCOL)
+# ==============================================================================
+ai_agent_protocol:
+  think_before_acting: 
+    enabled: true
+    rule: "AI MUST NOT write or edit code immediately. It MUST first provide a brief 'Thought Process / Plan' (identifying the problem, affected files, and architectural impact). Only after the plan is approved or aligned with the rules can the code be edited."
+  
+  folder_placement_protocol:
+    enabled: true
+    rule: "Before creating or editing any file, AI MUST explicitly state the correct target folder based on Clean Architecture (Domain, Application, Infrastructure, or Interfaces). If a new folder is required, it MUST be created in the correct hierarchical path. NEVER dump files in the root directory or unrelated folders."
+    placement_checklist:
+      - "Is this pure business logic? -> bangzen_prime/domain"
+      - "Is this orchestrating flow? -> bangzen_prime/application"
+      - "Is this external API/Database? -> bangzen_prime/infrastructure"
+      - "Is this CLI/UI/Telegram? -> bangzen_prime/interfaces"
+      - "Is this a test? -> tests/ (matching the layer)"
+
+  architectural_fidelity:
+    strict_folder_structure: true
+    rule: "Every new file or code change must respect Clean Architecture. Domain logic stays in /domain, Use Cases in /application, external APIs in /infrastructure, and UI/CLI in /interfaces. No 'quick hacks' outside their designated layer."
+    cleanliness: "Code must be typed (mypy), formatted (black/ruff), and readable."
+
+  reward_and_scoring_system:
+    enabled: true
+    description: "To ensure high-quality output, AI must self-evaluate every Pull Request or code edit and present a 'Quality Score'."
+    scoring_metrics:
+      ci_green: "40% (tools/ci.py MUST pass 100%)"
+      architecture_compliance: "30% (Files are in the correct folders, SOLID principles respected)"
+      code_cleanliness: "20% (No unused imports, no dead code, proper typing)"
+      test_coverage: "10% (New features have corresponding tests)"
+    score_display_requirement: "At the end of every code edit task, the AI MUST output: 'Quality Score: [X]/100%' with a brief breakdown of why it got that score."
 
 authority:
   precedence:
@@ -25,25 +58,28 @@ authority:
     - "Deleting, bypassing, or materially weakening tests or security controls"
 
 operating_modes:
-  read_only:
-    allowed: ["Market data reads", "Chain data reads", "Evidence validation", "Alerts"]
+  telegram_only:
+    description: "Bot scans market, validates evidence, and sends signals to Telegram ONLY. No transactions are signed or broadcast."
+    telegram_enabled: true
     transaction_signing: false
     transaction_broadcast: false
-  paper:
-    allowed: ["Simulated orders", "Simulated fills", "Fee and slippage modelling", "Position lifecycle tests"]
-    transaction_signing: false
-    transaction_broadcast: false
-  live:
-    enabled: false
+  execution_only:
+    description: "Bot scans, validates, and executes trades silently. Telegram notifications are DISABLED."
+    telegram_enabled: false
+    transaction_signing: true
+    transaction_broadcast: true
+  hybrid:
+    description: "Bot scans, validates, executes trades, AND sends Telegram notifications."
+    telegram_enabled: true
+    transaction_signing: true
+    transaction_broadcast: true
+  live_execution:
+    enabled: true 
     default: false
     requires:
-      - "Explicit written owner authorization for the specific change"
-      - "Independent security review"
-      - "Risk and execution tests with documented evidence"
-      - "Verified transaction simulation and reconciliation"
-      - "A tested emergency-stop and rollback procedure"
-      - "A separate approved implementation PR"
-    note: "No implementation or configuration may infer live authorization from a general request to improve the bot."
+      - "BANGZEN_LIVE_TRADING=true di .env"
+      - "BANGZEN_BURNER_PRIVATE_KEY yang valid di .env"
+      - "Operating Mode diset ke EXECUTION_ONLY atau HYBRID"
 
 non_negotiable_safety:
   fail_closed: true
@@ -52,8 +88,7 @@ non_negotiable_safety:
   insufficient_evidence_decision: "HOLD"
   ai_can_override_risk_veto: false
   ai_can_access_secrets: false
-  ai_can_sign_transactions: false
-  ai_can_broadcast_transactions: false
+  ai_can_sign_transactions: false 
   private_key_or_seed_phrase_in_repository: forbidden
   secrets_in_logs_or_telegram: forbidden
   disabling_security_checks_to_increase_signal_count: forbidden
@@ -71,7 +106,7 @@ architecture:
     - "Provider data is untrusted input until validated and normalized."
   responsibilities:
     ai_manager:
-      may: ["Summarize validated evidence", "Rank eligible strategies", "Select one permitted defensive or analysis module", "Return a schema-valid recommendation with reason codes"]
+      may: ["Summarize validated evidence", "Rank eligible strategies", "Return a schema-valid recommendation with reason codes"]
       may_not: ["Invent missing facts", "Change risk policy", "Access provider credentials", "Sign or broadcast transactions", "Override a deterministic veto"]
     data_gateway:
       owns: ["Provider adapters", "Credential injection", "Rate limits", "Retries", "Timeouts", "Caching", "Source provenance"]
@@ -80,8 +115,7 @@ architecture:
       owns: ["Hard safety gates", "Exposure limits", "Net-risk calculation", "Emergency stop", "Final veto"]
       ai_mutable: false
     execution:
-      current_scope: "Read-only and simulated execution only"
-      live_scope: "Locked pending separate owner approval"
+      current_scope: "Live execution enabled via mode-gating (TELEGRAM_ONLY, EXECUTION_ONLY, HYBRID)"
 
 evidence_contract:
   required_fields:
@@ -105,10 +139,7 @@ evidence_contract:
   rules:
     - "A provider response is an observation, not proof of safety."
     - "PARTIAL, UNAVAILABLE, CONFLICTED, or REJECTED evidence cannot satisfy a hard safety gate."
-    - "Historical coverage must state address scope, time scope, pagination state, provider, and known gaps."
-    - "EXHAUSTED pagination is not proof of complete blockchain or token history."
     - "Never treat missing values as zero, false, safe, or passed."
-    - "Every decision must be reproducible from stored evidence and policy version where practical."
 
 ai_decision_contract:
   allowed_actions: ["BUY_CANDIDATE", "HOLD", "SKIP"]
@@ -156,9 +187,10 @@ engineering:
     required: true
     preserve_existing_tests: true
     no_test_weakening: true
+    strict_ci_policy: "ZERO TOLERANCE. The AI MUST NOT proceed, merge, or declare completion if tools/ci.py fails. Faking a GREEN status or skipping tests is a critical violation."
     report_actual_commands_and_results: true
     required_gate: "python3 tools/ci.py"
-    done_definition: "Do not call a change DONE until the required gate is fully green and evidence is recorded. If tools/ci.py is absent or cannot run, report BLOCKED/NOT RUN, never PASS."
+    done_definition: "Do not call a change DONE until the required gate is 100% GREEN (0 Failures, 0 Errors) and evidence is recorded. If tools/ci.py cannot run, report BLOCKED/NOT RUN. Never claim PASS."
   security:
     dependency_changes_require_review: true
     static_analysis_required_when_available: true
@@ -213,7 +245,7 @@ incident_response:
     - "Escalate to the owner with impact, evidence, and containment steps."
 
 status_vocabulary:
-  PASS: "The exact check was run and passed."
+  PASS: "The exact check was run and passed 100%."
   FAIL: "The exact check was run and failed."
   NOT_RUN: "The check was not executed."
   BLOCKED: "The check could not execute because a prerequisite was unavailable."
