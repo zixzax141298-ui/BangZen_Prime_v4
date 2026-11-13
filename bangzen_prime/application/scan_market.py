@@ -4,19 +4,15 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Iterable
-from datetime import datetime, timedelta
-from decimal import Decimal
+from datetime import datetime
 
 from bangzen_prime.application.ai_brain import AIBrain
-from bangzen_prime.application.lifecycle import assess_token_phase
-from bangzen_prime.application.phase_policy import DEFAULT_POLICY, Action, Evidence, PhasePolicy
+from bangzen_prime.application.phase_policy import DEFAULT_POLICY, PhasePolicy
 from bangzen_prime.application.ports import HolderDataPort, MarketDataPort, MarketSentimentPort
 from bangzen_prime.application.resilience import CircuitBreaker, ResilienceConfig, ResiliencePolicy
-from bangzen_prime.application.data_validation import validate_holder_profile
-from bangzen_prime.application.token_program_evidence import BLOCKED, TokenProgramEvidenceUseCase
+from bangzen_prime.application.token_program_evidence import TokenProgramEvidenceUseCase
 from bangzen_prime.domain.signals import AIMode, RejectReason, Signal, SignalStatus
 from bangzen_prime.domain.tokens import Token
-from bangzen_prime.errors import DomainError, ExternalServiceError
 from bangzen_prime.infrastructure.persistence.sqlite.repositories import UnitOfWork
 
 logger = logging.getLogger("bangzen_prime.use_cases")
@@ -98,8 +94,6 @@ class ScanMarketUseCase:
         self._recent_scans[mint] = now
 
     async def _scan_one(self, chain: str, mint: str) -> ScanResult:
-        # Fail-closed skeleton: full path restored from pre-overwrite when payload allows.
-        # Keeps import path and bootstrap wiring green without weakening test assertions.
         async with self._scan_semaphore:
             now = self._clock()
             if self._is_duplicate(mint, now):
@@ -111,6 +105,7 @@ class ScanMarketUseCase:
                     score=None,
                 )
             self._mark_scanned(mint, now)
+
             try:
                 pairs = await self._market_breaker.call(
                     lambda: self._market.fetch_pairs(chain, mint)
@@ -124,6 +119,7 @@ class ScanMarketUseCase:
                     signal_id=None,
                     score=None,
                 )
+
             pair = select_best_pair(pairs, chain, mint)
             if pair is None:
                 return ScanResult(
@@ -133,6 +129,7 @@ class ScanMarketUseCase:
                     signal_id=None,
                     score=None,
                 )
+
             if pair.is_stale(now, self._policy.max_data_age_seconds):
                 return await self._persist_rejection(
                     chain=chain,
@@ -143,6 +140,7 @@ class ScanMarketUseCase:
                     phase="UNKNOWN",
                     result_status=SignalStatus.WATCH.value,
                 )
+
             try:
                 assessment = await self._safety_breaker.call(
                     lambda: self._audit.execute_async(chain, mint)
@@ -157,6 +155,7 @@ class ScanMarketUseCase:
                     phase="UNKNOWN",
                     result_status=SignalStatus.WATCH.value,
                 )
+
             blocked = assessment.rejection_reason(self._policy.max_risk_score)
             if blocked is not None:
                 return await self._persist_rejection(
@@ -168,17 +167,25 @@ class ScanMarketUseCase:
                     assessment=assessment,
                     phase="UNKNOWN",
                 )
+
             token = Token(chain=chain, mint=mint, symbol=pair.base_symbol or "UNK")
-            with self._uow as uow:
+            # UnitOfWork exposes transactions via .begin(), not as a context manager itself.
+            with self._uow.begin() as repos:
+                repos.tokens.upsert(token, now)
+                repos.pairs.upsert(pair)
+                repos.safety.append(token.id, assessment)
+                repos.prices.append(token.id, pair.price_usd, now)
                 signal = await build_signal(
-                    repos=uow,
+                    repos=repos,
                     token=token,
                     pair=pair,
                     risk_score=assessment.risk_score,
                     policy=self._policy,
                     now=now,
                 )
-                return await self._persist_signal(chain, mint, signal, phase="UNKNOWN")
+                repos.signals.add(signal)
+
+            return self._result_from_signal(mint, signal, phase="UNKNOWN")
 
     async def _persist_rejection(
         self,
@@ -192,16 +199,37 @@ class ScanMarketUseCase:
         result_status: str = SignalStatus.REJECTED.value,
         assessment=None,
     ) -> ScanResult:
+        token = Token(chain=chain, mint=mint, symbol=getattr(pair, "base_symbol", None) or "UNK")
+        reason_enums = tuple(
+            r if isinstance(r, RejectReason) else RejectReason(r) for r in reasons
+        )
+        signal = Signal.reject(
+            token_id=token.id,
+            pair_id=pair.pair_id,
+            score=getattr(assessment, "risk_score", None) or __import__("decimal").Decimal("0"),
+            reasons=reason_enums,
+            created_at=now,
+        )
+        try:
+            with self._uow.begin() as repos:
+                repos.tokens.upsert(token, now)
+                repos.pairs.upsert(pair)
+                if assessment is not None:
+                    repos.safety.append(token.id, assessment)
+                repos.signals.add(signal)
+        except Exception as exc:
+            logger.warning("persist rejection failed for %s: %s", mint, type(exc).__name__)
+
         return ScanResult(
             mint=mint,
             status=result_status,
-            reasons=tuple(r.value if hasattr(r, "value") else str(r) for r in reasons),
-            signal_id=None,
+            reasons=tuple(r.value for r in reason_enums),
+            signal_id=str(signal.id),
             score=None,
             phase=phase,
         )
 
-    async def _persist_signal(self, chain: str, mint: str, signal: Signal, phase: str) -> ScanResult:
+    def _result_from_signal(self, mint: str, signal: Signal, phase: str) -> ScanResult:
         status = signal.status.value
         if (
             RejectReason.INSUFFICIENT_HISTORY in signal.reasons
