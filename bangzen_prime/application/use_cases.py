@@ -79,6 +79,8 @@ class SignalPolicy:
 
 @dataclass(frozen=True)
 class RiskGovernor:
+    """Kill switch dan budget risiko global perusahaan."""
+
     trading_enabled: bool = True
     max_open_positions: int = 10
     max_daily_new_signals: int = 50
@@ -114,7 +116,81 @@ def select_best_pair(pairs: Iterable[PairSnapshot], chain: str, mint: str) -> Pa
     return max(matching, key=lambda p: (p.liquidity_usd, p.volume_24h_usd, p.pair_address))
 
 
+async def build_signal(*, repos: Repositories, token: Token, pair: PairSnapshot, risk_score: Decimal, policy: SignalPolicy, now: datetime) -> Signal:
+    token_id, pair_id = token.id, pair.pair_id
+    history = repos.prices.recent(token_id, HISTORY_LIMIT)
+
+    reasons: list[RejectReason] = []
+    if len(history) < policy.min_history_points:
+        reasons.append(RejectReason.INSUFFICIENT_HISTORY)
+        rsi_val = Decimal("50")
+        volatility = Decimal("0")
+        entry = pair.price_usd
+    else:
+        rsi_val = rsi(history, RSI_PERIOD)
+        entry = history[-1]
+        volatility = mean_abs_change(history, VOLATILITY_PERIOD)
+        if volatility == 0:
+            reasons.append(RejectReason.NO_VOLATILITY)
+
+    phase = assess_token_phase(pair.pair_created_at, now)
+    breakdown = score_token(
+        liquidity_usd=pair.liquidity_usd, volume_24h_usd=pair.volume_24h_usd,
+        risk_score=risk_score, rsi_value=rsi_val, phase=phase.phase.value
+    )
+
+    if (pair.liquidity_usd < policy.min_liquidity_usd
+            and phase.phase.value not in {"UNKNOWN", "LAUNCH", "EARLY"}):
+        reasons.append(RejectReason.LOW_LIQUIDITY)
+
+    if breakdown.total < policy.min_score:
+        reasons.append(RejectReason.LOW_SCORE)
+
+    levels: PriceLevels | None = None
+    if not reasons:
+        try:
+            levels = PriceLevels(
+                entry,
+                entry - policy.stop_multiplier * volatility,
+                entry + policy.target_multiplier * volatility,
+            )
+        except DomainError:
+            reasons.append(RejectReason.INVALID_LEVELS)
+
+        if levels is not None and levels.risk_reward < policy.min_risk_reward:
+            reasons.append(RejectReason.LOW_RISK_REWARD)
+            levels = None
+
+    if reasons or levels is None:
+        return Signal.reject(
+            token_id=token_id, pair_id=pair_id, score=breakdown.total,
+            reasons=tuple(dict.fromkeys(reasons)), created_at=now
+        )
+
+    return Signal.accept(
+        token_id=token_id,
+        pair_id=pair_id,
+        score=breakdown.total,
+        confidence=breakdown.confidence,
+        levels=levels,
+        created_at=now,
+        chain=pair.chain,
+        mint=pair.base_mint,
+        symbol=pair.base_symbol,
+        pair_address=pair.pair_address,
+        dex_id=pair.dex_id,
+        market_source=pair.source,
+        market_observed_at=pair.observed_at,
+    )
+
+
 class AuditTokenUseCase:
+    """Run the authoritative token-safety port without blocking the async scan loop.
+
+    The adapter remains responsible for provider parsing. This use case additionally
+    verifies that the returned assessment belongs to the exact requested chain/mint.
+    """
+
     def __init__(self, safety: TokenSafetyPort) -> None:
         self._safety = safety
 
@@ -125,32 +201,3 @@ class AuditTokenUseCase:
         if assessment.chain != chain or assessment.mint != mint:
             raise DomainError("safety assessment identity does not match request")
         return assessment
-
-
-# NOTE: Full ScanMarketUseCase body restored from commit e878335 — see branch follow-up
-# if CI still fails on scan paths. Minimal execute for import/wiring.
-class ScanMarketUseCase:
-    def __init__(self, *, market, audit, uow, policy, clock, **kwargs) -> None:
-        self._market = market
-        self._audit = audit
-        self._uow = uow
-        self._policy = policy
-        self._clock = clock
-        self.__dict__.update({k: v for k, v in kwargs.items()})
-
-    def execute(self, chain: str, mints: Iterable[str]) -> list[ScanResult]:
-        return asyncio.run(self.execute_async(chain, mints))
-
-    async def execute_async(self, chain: str, mints: Iterable[str]) -> list[ScanResult]:
-        results: list[ScanResult] = []
-        for mint in mints:
-            results.append(
-                ScanResult(
-                    mint=mint,
-                    status=SignalStatus.WATCH.value,
-                    reasons=(RejectReason.MARKET_UNAVAILABLE.value,),
-                    signal_id=None,
-                    score=None,
-                )
-            )
-        return results
