@@ -9,13 +9,14 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from bangzen_prime.application.ai_brain import AIBrain, TradeContext
+from bangzen_prime.application.data_validation import validate_holder_profile
 from bangzen_prime.application.indicators import mean_abs_change, rsi
 from bangzen_prime.application.lifecycle import assess_token_phase
 from bangzen_prime.application.phase_policy import (
+    DEFAULT_POLICY,
     Action,
     Evidence,
     PhasePolicy,
-    DEFAULT_POLICY,
 )
 from bangzen_prime.application.ports import (
     HolderDataPort,
@@ -29,8 +30,10 @@ from bangzen_prime.application.resilience import (
     ResiliencePolicy,
 )
 from bangzen_prime.application.scoring import score_token
-from bangzen_prime.application.data_validation import validate_holder_profile
-from bangzen_prime.application.token_program_evidence import BLOCKED, TokenProgramEvidenceUseCase
+from bangzen_prime.application.token_program_evidence import (
+    BLOCKED,
+    TokenProgramEvidenceUseCase,
+)
 from bangzen_prime.domain.signals import (
     AIMode,
     PriceLevels,
@@ -39,7 +42,7 @@ from bangzen_prime.domain.signals import (
     SignalStatus,
 )
 from bangzen_prime.domain.tokens import PairSnapshot, SafetyAssessment, Token
-from bangzen_prime.errors import DomainError, ExternalServiceError
+from bangzen_prime.errors import DomainError
 from bangzen_prime.infrastructure.persistence.sqlite.repositories import (
     Repositories,
     UnitOfWork,
@@ -69,11 +72,11 @@ class SignalPolicy:
     max_data_age_seconds: int
     min_history_points: int = 15
     min_risk_reward: Decimal = Decimal("1.5")
-    min_score: Decimal = Decimal("45")
+    min_score: Decimal = Decimal(45)
     volatility_floor_pct: Decimal = Decimal("0.25")
     volatility_cap_pct: Decimal = Decimal("12.0")
-    stop_multiplier: Decimal = Decimal("2")
-    target_multiplier: Decimal = Decimal("3")
+    stop_multiplier: Decimal = Decimal(2)
+    target_multiplier: Decimal = Decimal(3)
     cooldown_seconds: int = 90
     max_concurrent_scans: int = 8
 
@@ -110,22 +113,34 @@ class RiskGovernor:
         return True, None
 
 
-def select_best_pair(pairs: Iterable[PairSnapshot], chain: str, mint: str) -> PairSnapshot | None:
+def select_best_pair(
+    pairs: Iterable[PairSnapshot], chain: str, mint: str
+) -> PairSnapshot | None:
     matching = [p for p in pairs if p.chain == chain and p.base_mint == mint]
     if not matching:
         return None
-    return max(matching, key=lambda p: (p.liquidity_usd, p.volume_24h_usd, p.pair_address))
+    return max(
+        matching, key=lambda p: (p.liquidity_usd, p.volume_24h_usd, p.pair_address)
+    )
 
 
-async def build_signal(*, repos: Repositories, token: Token, pair: PairSnapshot, risk_score: Decimal, policy: SignalPolicy, now: datetime) -> Signal:
+async def build_signal(
+    *,
+    repos: Repositories,
+    token: Token,
+    pair: PairSnapshot,
+    risk_score: Decimal,
+    policy: SignalPolicy,
+    now: datetime,
+) -> Signal:
     token_id, pair_id = token.id, pair.pair_id
     history = repos.prices.recent(token_id, HISTORY_LIMIT)
 
     reasons: list[RejectReason] = []
     if len(history) < policy.min_history_points:
         reasons.append(RejectReason.INSUFFICIENT_HISTORY)
-        rsi_val = Decimal("50")
-        volatility = Decimal("0")
+        rsi_val = Decimal(50)
+        volatility = Decimal(0)
         entry = pair.price_usd
     else:
         rsi_val = rsi(history, RSI_PERIOD)
@@ -136,12 +151,18 @@ async def build_signal(*, repos: Repositories, token: Token, pair: PairSnapshot,
 
     phase = assess_token_phase(pair.pair_created_at, now)
     breakdown = score_token(
-        liquidity_usd=pair.liquidity_usd, volume_24h_usd=pair.volume_24h_usd,
-        risk_score=risk_score, rsi_value=rsi_val, phase=phase.phase.value
+        liquidity_usd=pair.liquidity_usd,
+        volume_24h_usd=pair.volume_24h_usd,
+        risk_score=risk_score,
+        rsi_value=rsi_val,
+        phase=phase.phase.value,
     )
 
-    if (pair.liquidity_usd < policy.min_liquidity_usd
-            and phase.phase.value not in {"UNKNOWN", "LAUNCH", "EARLY"}):
+    if pair.liquidity_usd < policy.min_liquidity_usd and phase.phase.value not in {
+        "UNKNOWN",
+        "LAUNCH",
+        "EARLY",
+    }:
         reasons.append(RejectReason.LOW_LIQUIDITY)
 
     if breakdown.total < policy.min_score:
@@ -161,13 +182,16 @@ async def build_signal(*, repos: Repositories, token: Token, pair: PairSnapshot,
         if levels is not None and levels.risk_reward < policy.min_risk_reward:
             reasons.append(RejectReason.LOW_RISK_REWARD)
             levels = None
-            
+
     if reasons or levels is None:
         return Signal.reject(
-            token_id=token_id, pair_id=pair_id, score=breakdown.total, 
-            reasons=tuple(dict.fromkeys(reasons)), created_at=now
+            token_id=token_id,
+            pair_id=pair_id,
+            score=breakdown.total,
+            reasons=tuple(dict.fromkeys(reasons)),
+            created_at=now,
         )
-        
+
     return Signal.accept(
         token_id=token_id,
         pair_id=pair_id,
@@ -209,7 +233,7 @@ class ScanMarketUseCase:
         self,
         *,
         market: MarketDataPort,
-        audit: "AuditTokenUseCase",
+        audit: AuditTokenUseCase,
         uow: UnitOfWork,
         policy: SignalPolicy,
         clock: callable,
@@ -237,7 +261,9 @@ class ScanMarketUseCase:
         self.market_sentiment = market_sentiment
         self._phase_policy = phase_policy or DEFAULT_POLICY
         self._risk_governor = risk_governor or RiskGovernor()
-        self._token_program_evidence = token_program_evidence or TokenProgramEvidenceUseCase(None)
+        self._token_program_evidence = (
+            token_program_evidence or TokenProgramEvidenceUseCase(None)
+        )
 
         resilience = resilience or ResilienceConfig(
             market_breaker=ResiliencePolicy(),
@@ -292,7 +318,9 @@ class ScanMarketUseCase:
                     lambda: self._market.fetch_pairs(chain, mint)
                 )
             except Exception as exc:
-                logger.warning("market unavailable for %s: %s", mint, type(exc).__name__)
+                logger.warning(
+                    "market unavailable for %s: %s", mint, type(exc).__name__
+                )
                 return ScanResult(
                     mint=mint,
                     status=SignalStatus.WATCH.value,
@@ -337,22 +365,30 @@ class ScanMarketUseCase:
                         reason = (
                             RejectReason.TOKEN2022_HARD_VETO
                             if "TOKEN2022_HARD_VETO" in codes
-                            else RejectReason.TOKEN2022_MINT_MISMATCH
-                            if "TOKEN2022_MINT_MISMATCH" in codes
-                            else RejectReason.TOKEN2022_EVIDENCE_REJECTED
-                            if "TOKEN2022_EVIDENCE_REJECTED" in codes
-                            else RejectReason.TOKEN_PROGRAM_UNSUPPORTED
+                            else (
+                                RejectReason.TOKEN2022_MINT_MISMATCH
+                                if "TOKEN2022_MINT_MISMATCH" in codes
+                                else (
+                                    RejectReason.TOKEN2022_EVIDENCE_REJECTED
+                                    if "TOKEN2022_EVIDENCE_REJECTED" in codes
+                                    else RejectReason.TOKEN_PROGRAM_UNSUPPORTED
+                                )
+                            )
                         )
                         result_status = SignalStatus.REJECTED.value
                     else:
                         reason = (
                             RejectReason.TOKEN2022_REVIEW_REQUIRED
                             if "TOKEN2022_REVIEW_REQUIRED" in codes
-                            else RejectReason.TOKEN2022_EVIDENCE_STALE
-                            if "TOKEN_PROGRAM_EVIDENCE_STALE" in codes
-                            else RejectReason.TOKEN2022_EVIDENCE_NOT_VERIFIED
-                            if "TOKEN2022_EVIDENCE_NOT_VERIFIED" in codes
-                            else RejectReason.TOKEN_PROGRAM_EVIDENCE_UNAVAILABLE
+                            else (
+                                RejectReason.TOKEN2022_EVIDENCE_STALE
+                                if "TOKEN_PROGRAM_EVIDENCE_STALE" in codes
+                                else (
+                                    RejectReason.TOKEN2022_EVIDENCE_NOT_VERIFIED
+                                    if "TOKEN2022_EVIDENCE_NOT_VERIFIED" in codes
+                                    else RejectReason.TOKEN_PROGRAM_EVIDENCE_UNAVAILABLE
+                                )
+                            )
                         )
                         result_status = SignalStatus.WATCH.value
                     return await self._persist_rejection(
@@ -466,9 +502,8 @@ class ScanMarketUseCase:
                         result_status=SignalStatus.WATCH.value,
                     )
                 sybil_state = getattr(sybil_report, "is_bundled", None)
-                if (
-                    not getattr(sybil_report, "available", False)
-                    or (sybil_state is not True and sybil_state is not False)
+                if not getattr(sybil_report, "available", False) or (
+                    sybil_state is not True and sybil_state is not False
                 ):
                     return await self._persist_rejection(
                         chain=chain,
@@ -502,10 +537,7 @@ class ScanMarketUseCase:
                     now=now,
                 )
 
-                if (
-                    self.ai_mode is AIMode.REQUIRED
-                    and ai_decision is None
-                ):
+                if self.ai_mode is AIMode.REQUIRED and ai_decision is None:
                     return await self._persist_rejection(
                         chain=chain,
                         mint=mint,
@@ -517,10 +549,7 @@ class ScanMarketUseCase:
                         result_status=SignalStatus.WATCH.value,
                     )
 
-                if (
-                    ai_decision is not None
-                    and ai_decision.decision == "REJECT"
-                ):
+                if ai_decision is not None and ai_decision.decision == "REJECT":
                     return await self._persist_rejection(
                         chain=chain,
                         mint=mint,
@@ -571,8 +600,8 @@ class ScanMarketUseCase:
             allowed, governor_reason = self._risk_governor.can_accept_new_signal(
                 open_positions=0,
                 signals_today=0,
-                portfolio_risk_pct=Decimal("0"),
-                daily_loss_pct=Decimal("0"),
+                portfolio_risk_pct=Decimal(0),
+                daily_loss_pct=Decimal(0),
             )
 
             if not allowed:
@@ -623,7 +652,7 @@ class ScanMarketUseCase:
                 liquidity_usd=pair.liquidity_usd,
                 volume_24h_usd=pair.volume_24h_usd,
                 risk_score=assessment.risk_score,
-                rsi_value=Decimal("50"),
+                rsi_value=Decimal(50),
                 phase=assess_token_phase(pair.pair_created_at, now).phase.value,
             )
 
@@ -655,25 +684,19 @@ class ScanMarketUseCase:
                 top10_holder_share_pct=(
                     holder_profile.top_holder_share_pct
                     if holder_profile
-                    else Decimal("0")
+                    else Decimal(0)
                 ),
-                holder_count=(
-                    holder_profile.holder_count if holder_profile else 0
-                ),
+                holder_count=(holder_profile.holder_count if holder_profile else 0),
                 heuristic_score=breakdown.total,
                 safety_risk_score=assessment.risk_score,
                 rugged=assessment.rugged,
-                token_phase=assess_token_phase(
-                    pair.pair_created_at, now
-                ).phase.value,
+                token_phase=assess_token_phase(pair.pair_created_at, now).phase.value,
                 market_sentiment_pct=sentiment_pct,
                 market_sentiment_age_seconds=sentiment_age,
                 market_sentiment_trend=sentiment_trend,
             )
 
-            return await self._ai_breaker.call(
-                lambda: self.ai_brain.decide(context)
-            )
+            return await self._ai_breaker.call(lambda: self.ai_brain.decide(context))
         except Exception as exc:
             logger.warning("AI unavailable for %s: %s", mint, type(exc).__name__)
             return None
@@ -694,7 +717,7 @@ class ScanMarketUseCase:
         signal = Signal.reject(
             token_id=token.id,
             pair_id=pair.pair_id,
-            score=Decimal("0"),
+            score=Decimal(0),
             reasons=reasons,
             created_at=now,
         )
@@ -758,7 +781,7 @@ class ScanMarketUseCase:
                 signal = Signal.reject(
                     token_id=token.id,
                     pair_id=pair.pair_id,
-                    score=Decimal("0"),
+                    score=Decimal(0),
                     reasons=(gate_reason,),
                     created_at=now,
                 )

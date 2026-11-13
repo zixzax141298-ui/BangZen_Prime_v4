@@ -9,8 +9,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import time
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from dotenv import load_dotenv
 
@@ -80,15 +79,13 @@ def make_status_strip() -> Panel:
         Text.from_markup(f"[{EMERALD}]● PAPER[/]"),
         Text.from_markup(f"[{CYAN}]MODE {mode}[/]"),
         Text.from_markup(f"[{GOLD}]● LIVE LOCKED[/]"),
-        Text.from_markup(f"[{MUTED}]UTC {datetime.now(timezone.utc).strftime('%H:%M:%S')}[/]"),
+        Text.from_markup(f"[{MUTED}]UTC {datetime.now(UTC).strftime('%H:%M:%S')}[/]"),
     )
     return Panel(grid, border_style=GOLD_DIM, box=box.ROUNDED, height=3)
 
 
 def make_radar_panel() -> Panel:
-    rows = _safe_query(
-        "SELECT mint, symbol FROM tokens ORDER BY rowid DESC LIMIT 10"
-    )
+    rows = _safe_query("SELECT mint, symbol FROM tokens ORDER BY rowid DESC LIMIT 10")
     table = Table(
         expand=True,
         box=box.SIMPLE_HEAVY,
@@ -104,7 +101,9 @@ def make_radar_panel() -> Panel:
         table.add_row("—", "awaiting discoveries…", "—")
     else:
         for i, (mint, symbol) in enumerate(rows, 1):
-            short = f"{mint[:4]}…{mint[-4:]}" if mint and len(mint) > 12 else (mint or "—")
+            short = (
+                f"{mint[:4]}…{mint[-4:]}" if mint and len(mint) > 12 else (mint or "—")
+            )
             table.add_row(str(i), short, symbol or "—")
 
     return Panel(
@@ -130,10 +129,14 @@ def make_signals_panel() -> Panel:
         for sid, status, score in rows:
             ref = str(sid)[:8] if sid else "—"
             st = str(status or "—")
-            style = EMERALD if "ACCEPT" in st.upper() else (
-                CRIMSON if "REJECT" in st.upper() else IVORY
+            style = (
+                EMERALD
+                if "ACCEPT" in st.upper()
+                else (CRIMSON if "REJECT" in st.upper() else IVORY)
             )
-            table.add_row(ref, Text(st, style=style), str(score if score is not None else "—"))
+            table.add_row(
+                ref, Text(st, style=style), str(score if score is not None else "—")
+            )
 
     return Panel(
         table,
@@ -200,7 +203,9 @@ def build_dashboard() -> Layout:
         Layout(name="body", ratio=1),
         Layout(name="footer", size=3),
     )
-    layout["header"].update(render_compact_header(version=__version__, mode=_mode_label()))
+    layout["header"].update(
+        render_compact_header(version=__version__, mode=_mode_label())
+    )
     layout["strip"].update(make_status_strip())
     layout["footer"].update(make_footer())
 
@@ -229,16 +234,16 @@ def splash() -> None:
         subtitle="Command deck · research only",
     )
     console.print()
-    console.print(
-        Align.center(Text("initializing command deck…", style=MUTED))
-    )
+    console.print(Align.center(Text("initializing command deck…", style=MUTED)))
     time.sleep(0.8)
 
 
 def main() -> None:
     splash()
     try:
-        with Live(build_dashboard(), console=console, screen=True, refresh_per_second=1) as live:
+        with Live(
+            build_dashboard(), console=console, screen=True, refresh_per_second=1
+        ) as live:
             while True:
                 live.update(build_dashboard())
                 time.sleep(1)

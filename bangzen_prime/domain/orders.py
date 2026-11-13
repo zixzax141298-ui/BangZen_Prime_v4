@@ -17,8 +17,14 @@ class OrderStatus(StrEnum):
 
 
 _TRANSITIONS: dict[OrderStatus, frozenset[OrderStatus]] = {
-    OrderStatus.NEW: frozenset({OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED,
-                                OrderStatus.REJECTED, OrderStatus.TIMEOUT}),
+    OrderStatus.NEW: frozenset(
+        {
+            OrderStatus.FILLED,
+            OrderStatus.PARTIALLY_FILLED,
+            OrderStatus.REJECTED,
+            OrderStatus.TIMEOUT,
+        }
+    ),
     OrderStatus.FILLED: frozenset({OrderStatus.CLOSED}),
     OrderStatus.PARTIALLY_FILLED: frozenset({OrderStatus.CLOSED}),
     OrderStatus.REJECTED: frozenset(),

@@ -33,7 +33,9 @@ class IndicatorTest(unittest.TestCase):
         self.assertEqual(rsi(down, 14), D(0))
 
     def test_rsi_within_0_100_for_mixed_series(self):
-        series = [D(x) for x in (10, 11, 9, 12, 8, 13, 7, 14, 6, 15, 5, 16, 4, 17, 3, 18)]
+        series = [
+            D(x) for x in (10, 11, 9, 12, 8, 13, 7, 14, 6, 15, 5, 16, 4, 17, 3, 18)
+        ]
         value = rsi(series, 14)
         self.assertTrue(D(0) <= value <= D(100))
 
@@ -61,38 +63,84 @@ class IndicatorTest(unittest.TestCase):
 
 class ScoringTest(unittest.TestCase):
     def test_score_bounds_and_confidence(self):
-        b = score_token(liquidity_usd=D("1000000"), volume_24h_usd=D("9000000"),
-                        risk_score=D(0), rsi_value=D(55))
+        b = score_token(
+            liquidity_usd=D("1000000"),
+            volume_24h_usd=D("9000000"),
+            risk_score=D(0),
+            rsi_value=D(55),
+        )
         self.assertEqual(b.total, D("100.00"))
         self.assertEqual(b.confidence, D("1.00"))
 
     def test_zero_everything_low_score(self):
-        b = score_token(liquidity_usd=D(0), volume_24h_usd=D(0), risk_score=D(100), rsi_value=D(0))
+        b = score_token(
+            liquidity_usd=D(0), volume_24h_usd=D(0), risk_score=D(100), rsi_value=D(0)
+        )
         self.assertEqual(b.total, D("0.00"))
 
     def test_invalid_inputs_rejected(self):
         with self.assertRaises(DomainError):
-            score_token(liquidity_usd=D(-1), volume_24h_usd=D(0), risk_score=D(0), rsi_value=D(50))
+            score_token(
+                liquidity_usd=D(-1),
+                volume_24h_usd=D(0),
+                risk_score=D(0),
+                rsi_value=D(50),
+            )
         with self.assertRaises(DomainError):
-            score_token(liquidity_usd=D(1), volume_24h_usd=D(0), risk_score=D(101), rsi_value=D(50))
+            score_token(
+                liquidity_usd=D(1),
+                volume_24h_usd=D(0),
+                risk_score=D(101),
+                rsi_value=D(50),
+            )
         with self.assertRaises(DomainError):
-            score_token(liquidity_usd=D(1), volume_24h_usd=D(0), risk_score=D(0), rsi_value=D("NaN"))
+            score_token(
+                liquidity_usd=D(1),
+                volume_24h_usd=D(0),
+                risk_score=D(0),
+                rsi_value=D("NaN"),
+            )
 
     def test_early_phase_weights_liquidity_less_than_mature_phase(self):
-        early = score_token(liquidity_usd=D(5000), volume_24h_usd=D(300000),
-                            risk_score=D(10), rsi_value=D(55), phase="LAUNCH")
-        mature = score_token(liquidity_usd=D(5000), volume_24h_usd=D(300000),
-                             risk_score=D(10), rsi_value=D(55), phase="MATURE")
+        early = score_token(
+            liquidity_usd=D(5000),
+            volume_24h_usd=D(300000),
+            risk_score=D(10),
+            rsi_value=D(55),
+            phase="LAUNCH",
+        )
+        mature = score_token(
+            liquidity_usd=D(5000),
+            volume_24h_usd=D(300000),
+            risk_score=D(10),
+            rsi_value=D(55),
+            phase="MATURE",
+        )
         self.assertGreater(early.total, mature.total)
 
     def test_unknown_phase_is_rejected_as_bad_context(self):
         with self.assertRaises(ValueError):
-            score_token(liquidity_usd=D(1), volume_24h_usd=D(1),
-                        risk_score=D(1), rsi_value=D(50), phase="NOT_A_PHASE")
+            score_token(
+                liquidity_usd=D(1),
+                volume_24h_usd=D(1),
+                risk_score=D(1),
+                rsi_value=D(50),
+                phase="NOT_A_PHASE",
+            )
 
     def test_safety_weight_reduces_score_as_risk_rises(self):
-        low = score_token(liquidity_usd=D(50000), volume_24h_usd=D(50000), risk_score=D(10), rsi_value=D(55))
-        high = score_token(liquidity_usd=D(50000), volume_24h_usd=D(50000), risk_score=D(90), rsi_value=D(55))
+        low = score_token(
+            liquidity_usd=D(50000),
+            volume_24h_usd=D(50000),
+            risk_score=D(10),
+            rsi_value=D(55),
+        )
+        high = score_token(
+            liquidity_usd=D(50000),
+            volume_24h_usd=D(50000),
+            risk_score=D(90),
+            rsi_value=D(55),
+        )
         self.assertGreater(low.total, high.total)
 
 

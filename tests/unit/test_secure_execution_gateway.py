@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import unittest
 import uuid
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from bangzen_prime.application.mode_controller import ModeController
@@ -24,8 +23,7 @@ from bangzen_prime.errors import ConfigurationError
 from bangzen_prime.infrastructure.persistence.sqlite.database import Database
 from bangzen_prime.settings import Settings
 
-
-NOW = datetime(2026, 11, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
 
 
 def _settings(**overrides) -> Settings:
@@ -64,11 +62,13 @@ class ConstructionSecurityTests(unittest.TestCase):
     def test_refuses_live_trading_settings(self):
         # Settings.from_env already blocks LIVE_TRADING; gateway also guards.
         with self.assertRaises(ConfigurationError):
-            Settings.from_env({
-                "BANGZEN_LIVE_TRADING": "true",
-                "BANGZEN_PAPER_TRADING": "true",
-                "BANGZEN_DRY_RUN": "true",
-            })
+            Settings.from_env(
+                {
+                    "BANGZEN_LIVE_TRADING": "true",
+                    "BANGZEN_PAPER_TRADING": "true",
+                    "BANGZEN_DRY_RUN": "true",
+                }
+            )
 
     def test_refuses_missing_paper_flags_via_gateway_invariant(self):
         # Construct a Settings-like object is hard; use real settings then
@@ -80,14 +80,14 @@ class ConstructionSecurityTests(unittest.TestCase):
 
 
 class ModeMatrixTests(unittest.TestCase):
-    def _gateway(self, mode: OperatingMode, *, emergency: bool = False) -> SecureExecutionGateway:
+    def _gateway(
+        self, mode: OperatingMode, *, emergency: bool = False
+    ) -> SecureExecutionGateway:
         controller = ModeController(mode)
         # Selecting non-telegram does not clear kill switch; paper path uses mode.execution_requested
         settings = _settings(
-            **{
-                "BANGZEN_OPERATING_MODE": mode.value,
-                "BANGZEN_EMERGENCY_STOP": "true" if emergency else "false",
-            }
+            BANGZEN_OPERATING_MODE=mode.value,
+            BANGZEN_EMERGENCY_STOP="true" if emergency else "false",
         )
         return SecureExecutionGateway(
             settings=settings,

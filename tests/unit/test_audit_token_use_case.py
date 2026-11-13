@@ -24,7 +24,7 @@ def assessment(chain="solana", mint=TOKEN_MINT):
     return SafetyAssessment.create(
         chain=chain,
         mint=mint,
-        risk_score=Decimal("12"),
+        risk_score=Decimal(12),
         rugged=False,
         source="fake",
         checked_at=START,
@@ -34,12 +34,16 @@ def assessment(chain="solana", mint=TOKEN_MINT):
 class AuditTokenUseCaseTest(unittest.TestCase):
     def test_returns_assessment_for_exact_requested_identity(self):
         safety = FakeSafety(assessment())
-        result = asyncio.run(AuditTokenUseCase(safety).execute_async("solana", TOKEN_MINT))
+        result = asyncio.run(
+            AuditTokenUseCase(safety).execute_async("solana", TOKEN_MINT)
+        )
         self.assertEqual(result, safety.assessment)
         self.assertEqual(safety.calls, [("solana", TOKEN_MINT)])
 
     def test_rejects_assessment_for_different_mint(self):
-        safety = FakeSafety(assessment(mint="So11111111111111111111111111111111111111112"))
+        safety = FakeSafety(
+            assessment(mint="So11111111111111111111111111111111111111112")
+        )
         with self.assertRaises(DomainError):
             asyncio.run(AuditTokenUseCase(safety).execute_async("solana", TOKEN_MINT))
 
@@ -54,7 +58,9 @@ class AuditTokenUseCaseTest(unittest.TestCase):
                 raise RuntimeError("provider unavailable")
 
         with self.assertRaises(RuntimeError):
-            asyncio.run(AuditTokenUseCase(BrokenSafety()).execute_async("solana", TOKEN_MINT))
+            asyncio.run(
+                AuditTokenUseCase(BrokenSafety()).execute_async("solana", TOKEN_MINT)
+            )
 
 
 if __name__ == "__main__":

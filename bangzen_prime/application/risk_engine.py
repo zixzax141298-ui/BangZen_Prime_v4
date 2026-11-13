@@ -15,7 +15,9 @@ from decimal import Decimal
 from bangzen_prime.domain.risk import PortfolioSnapshot, SizingResult, size_position
 from bangzen_prime.domain.shared import ensure_utc
 from bangzen_prime.domain.signals import PriceLevels
-from bangzen_prime.domain.token_2022_extension_evidence import Token2022ExtensionEvidence
+from bangzen_prime.domain.token_2022_extension_evidence import (
+    Token2022ExtensionEvidence,
+)
 from bangzen_prime.domain.token_2022_extensions import REJECTED
 from bangzen_prime.domain.token_2022_risk import evaluate_token_2022_risk
 from bangzen_prime.domain.token_programs import (
@@ -31,14 +33,14 @@ ZERO = Decimal(0)
 
 @dataclass(frozen=True)
 class RiskLimits:
-    max_risk_per_trade_pct: Decimal         # percent of equity (quote currency)
-    max_open_positions: int                  # count
-    max_exposure_quote: Decimal              # quote currency, total notional of open positions
-    max_drawdown_pct: Decimal                # percent of peak equity
-    min_liquidity_usd: Decimal               # USD of pair liquidity
-    max_spread_pct: Decimal                  # percent of price
-    max_slippage_pct: Decimal                # percent of price
-    fee_rate: Decimal                        # fraction per side
+    max_risk_per_trade_pct: Decimal  # percent of equity (quote currency)
+    max_open_positions: int  # count
+    max_exposure_quote: Decimal  # quote currency, total notional of open positions
+    max_drawdown_pct: Decimal  # percent of peak equity
+    min_liquidity_usd: Decimal  # USD of pair liquidity
+    max_spread_pct: Decimal  # percent of price
+    max_slippage_pct: Decimal  # percent of price
+    fee_rate: Decimal  # fraction per side
     loss_cooldown: timedelta = timedelta(hours=1)
     max_portfolio_age: timedelta = timedelta(seconds=60)
     emergency_stop: bool = False
@@ -46,7 +48,9 @@ class RiskLimits:
     def __post_init__(self) -> None:
         """Reject malformed limits at construction, before they can approve a trade."""
         percent(self.max_risk_per_trade_pct, "max_risk_per_trade_pct", allow_zero=False)
-        if isinstance(self.max_open_positions, bool) or not isinstance(self.max_open_positions, int):
+        if isinstance(self.max_open_positions, bool) or not isinstance(
+            self.max_open_positions, int
+        ):
             raise DomainError("max_open_positions must be an integer")
         if self.max_open_positions <= 0:
             raise DomainError("max_open_positions must be positive")
@@ -56,9 +60,13 @@ class RiskLimits:
         percent(self.max_spread_pct, "max_spread_pct")
         percent(self.max_slippage_pct, "max_slippage_pct")
         unit_interval(self.fee_rate, "fee_rate")
-        if not isinstance(self.loss_cooldown, timedelta) or self.loss_cooldown < timedelta(0):
+        if not isinstance(
+            self.loss_cooldown, timedelta
+        ) or self.loss_cooldown < timedelta(0):
             raise DomainError("loss_cooldown must be a non-negative timedelta")
-        if not isinstance(self.max_portfolio_age, timedelta) or self.max_portfolio_age <= timedelta(0):
+        if not isinstance(
+            self.max_portfolio_age, timedelta
+        ) or self.max_portfolio_age <= timedelta(0):
             raise DomainError("max_portfolio_age must be a positive timedelta")
         if not isinstance(self.emergency_stop, bool):
             raise DomainError("emergency_stop must be boolean")
@@ -76,14 +84,18 @@ class TradeRequest:
     token_program: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.signal_id, uuid.UUID) or not isinstance(self.token_id, uuid.UUID):
+        if not isinstance(self.signal_id, uuid.UUID) or not isinstance(
+            self.token_id, uuid.UUID
+        ):
             raise DomainError("signal_id and token_id must be UUID values")
         if not isinstance(self.token_mint, str) or not self.token_mint.strip():
             raise DomainError("token_mint must not be empty")
         if self.token_program is not None and (
             not isinstance(self.token_program, str) or not self.token_program.strip()
         ):
-            raise DomainError("token_program must be a non-empty program ID when provided")
+            raise DomainError(
+                "token_program must be a non-empty program ID when provided"
+            )
         if not isinstance(self.levels, PriceLevels):
             raise DomainError("levels must be validated PriceLevels")
         non_negative(self.liquidity_usd, "liquidity_usd")
@@ -103,7 +115,9 @@ class RiskDecision:
             "approved": self.approved,
             "reasons": list(self.reasons),
             "size_units": str(self.sizing.size_units) if self.sizing else None,
-            "risk_amount_quote": str(self.sizing.risk_amount_quote) if self.sizing else None,
+            "risk_amount_quote": (
+                str(self.sizing.risk_amount_quote) if self.sizing else None
+            ),
             "exposure_quote": str(self.sizing.exposure_quote) if self.sizing else None,
         }
 
@@ -114,9 +128,14 @@ class RiskEngine:
             raise DomainError("limits must be a validated RiskLimits instance")
         self.limits = limits
 
-    def evaluate(self, request: TradeRequest, portfolio: PortfolioSnapshot,
-                 now: datetime, *,
-                 token_program_evidence: Token2022ExtensionEvidence | None = None) -> RiskDecision:
+    def evaluate(
+        self,
+        request: TradeRequest,
+        portfolio: PortfolioSnapshot,
+        now: datetime,
+        *,
+        token_program_evidence: Token2022ExtensionEvidence | None = None,
+    ) -> RiskDecision:
         if not isinstance(request, TradeRequest):
             raise DomainError("request must be a validated TradeRequest")
         if not isinstance(portfolio, PortfolioSnapshot):
@@ -147,7 +166,8 @@ class RiskEngine:
                 token_program_evidence.token_program != TOKEN_PROGRAM_ID
                 or token_program_evidence.validation_status != REJECTED
                 or token_program_evidence.account_data_length != 82
-                or "CLASSIC_SPL_MINT_CONFIRMED" not in token_program_evidence.reason_codes
+                or "CLASSIC_SPL_MINT_CONFIRMED"
+                not in token_program_evidence.reason_codes
             ):
                 reasons.append("TOKEN_PROGRAM_EVIDENCE_INVALID")
             else:
@@ -158,9 +178,7 @@ class RiskEngine:
             if (
                 token_program_evidence is not None
                 and not isinstance(token_program_evidence, Token2022ExtensionEvidence)
-            ):
-                reasons.append("TOKEN_PROGRAM_EVIDENCE_INVALID")
-            elif (
+            ) or (
                 token_program_evidence is not None
                 and token_program_evidence.token_program != TOKEN_2022_PROGRAM_ID
             ):
@@ -176,7 +194,10 @@ class RiskEngine:
                     reasons.extend(token_gate.reason_codes)
         if portfolio.drawdown_pct >= lim.max_drawdown_pct:
             reasons.append("DRAWDOWN_LIMIT")
-        if portfolio.last_loss_at is not None and now - portfolio.last_loss_at < lim.loss_cooldown:
+        if (
+            portfolio.last_loss_at is not None
+            and now - portfolio.last_loss_at < lim.loss_cooldown
+        ):
             reasons.append("COOLDOWN")
         if portfolio.open_count >= lim.max_open_positions:
             reasons.append("MAX_POSITIONS")
@@ -188,16 +209,24 @@ class RiskEngine:
             reasons.append("SLIPPAGE_TOO_HIGH")
 
         try:
-            sizing = size_position(equity_quote=portfolio.equity_quote,
-                                   risk_pct=lim.max_risk_per_trade_pct,
-                                   levels=request.levels, fee_rate=lim.fee_rate)
+            sizing = size_position(
+                equity_quote=portfolio.equity_quote,
+                risk_pct=lim.max_risk_per_trade_pct,
+                levels=request.levels,
+                fee_rate=lim.fee_rate,
+            )
         except DomainError:
             return RiskDecision(False, tuple(reasons + ["ZERO_STOP_DISTANCE"]), None)
 
         budget = portfolio.equity_quote * lim.max_risk_per_trade_pct / Decimal(100)
-        if sizing.risk_amount_quote + sizing.estimated_fees_quote > budget + Decimal("1E-18"):
+        if sizing.risk_amount_quote + sizing.estimated_fees_quote > budget + Decimal(
+            "1E-18"
+        ):
             reasons.append("RISK_LIMIT")
-        if portfolio.open_exposure_quote + sizing.exposure_quote > lim.max_exposure_quote:
+        if (
+            portfolio.open_exposure_quote + sizing.exposure_quote
+            > lim.max_exposure_quote
+        ):
             reasons.append("EXPOSURE_LIMIT")
         if reasons:
             return RiskDecision(False, tuple(dict.fromkeys(reasons)), sizing)
@@ -219,7 +248,9 @@ class ExposureReservations:
 
     def try_reserve(self, amount: Decimal, current_open_exposure: Decimal) -> bool:
         amount = positive(amount, "reservation amount")
-        current_open_exposure = non_negative(current_open_exposure, "current_open_exposure")
+        current_open_exposure = non_negative(
+            current_open_exposure, "current_open_exposure"
+        )
         with self._lock:
             if current_open_exposure + self._reserved + amount > self._limit:
                 return False

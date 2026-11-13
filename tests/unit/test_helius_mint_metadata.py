@@ -41,9 +41,11 @@ def rpc_result(*, owner=TOKEN_PROGRAM, raw=None, slot=500, executable=False):
 class HeliusMintMetadataReaderTests(unittest.TestCase):
     def reader(self, payload):
         calls = []
+
         def account_info(address):
             calls.append(address)
             return payload
+
         reader = HeliusMintMetadataReader(account_info=account_info, clock=lambda: NOW)
         return reader, calls
 

@@ -12,9 +12,11 @@ from bangzen_prime.application.risk_engine import (
 )
 from bangzen_prime.domain.risk import OpenPosition, PortfolioSnapshot
 from bangzen_prime.domain.signals import PriceLevels
-from bangzen_prime.domain.token_programs import TOKEN_PROGRAM_ID
-from bangzen_prime.domain.token_2022_extension_evidence import Token2022ExtensionEvidence
+from bangzen_prime.domain.token_2022_extension_evidence import (
+    Token2022ExtensionEvidence,
+)
 from bangzen_prime.domain.token_2022_extensions import REJECTED
+from bangzen_prime.domain.token_programs import TOKEN_PROGRAM_ID
 from bangzen_prime.errors import DomainError
 from tests.support import START, TOKEN_MINT
 
@@ -22,32 +24,53 @@ D = Decimal
 
 
 def limits(**overrides):
-    base = dict(max_risk_per_trade_pct=D(1), max_open_positions=3, max_exposure_quote=D(500),
-                max_drawdown_pct=D(20), min_liquidity_usd=D(10000), max_spread_pct=D("1"),
-                max_slippage_pct=D("1"), fee_rate=D("0.001"))
+    base = dict(
+        max_risk_per_trade_pct=D(1),
+        max_open_positions=3,
+        max_exposure_quote=D(500),
+        max_drawdown_pct=D(20),
+        min_liquidity_usd=D(10000),
+        max_spread_pct=D("1"),
+        max_slippage_pct=D("1"),
+        fee_rate=D("0.001"),
+    )
     base.update(overrides)
     return RiskLimits(**base)
 
 
 def request(**overrides):
-    base = dict(signal_id=uuid.uuid4(), token_id=uuid.uuid4(), token_mint=TOKEN_MINT,
-                levels=PriceLevels(D(2), D("1.8"), D("2.3")), liquidity_usd=D(50000),
-                spread_pct=D(0), slippage_pct=D("0.5"), token_program=TOKEN_PROGRAM_ID)
+    base = dict(
+        signal_id=uuid.uuid4(),
+        token_id=uuid.uuid4(),
+        token_mint=TOKEN_MINT,
+        levels=PriceLevels(D(2), D("1.8"), D("2.3")),
+        liquidity_usd=D(50000),
+        spread_pct=D(0),
+        slippage_pct=D("0.5"),
+        token_program=TOKEN_PROGRAM_ID,
+    )
     base.update(overrides)
     return TradeRequest(**base)
 
 
 def portfolio(**overrides):
-    base = dict(equity_quote="1000", peak_equity_quote="1000", open_positions=(), as_of=START)
+    base = dict(
+        equity_quote="1000", peak_equity_quote="1000", open_positions=(), as_of=START
+    )
     base.update(overrides)
     return PortfolioSnapshot.create(**base)
 
 
 def classic_mint_evidence(mint):
     return Token2022ExtensionEvidence(
-        mint=mint, validation_status=REJECTED, observed_at=START,
-        source="test", source_record_id="classic-mint", slot=1,
-        token_program=TOKEN_PROGRAM_ID, account_data_length=82,
+        mint=mint,
+        validation_status=REJECTED,
+        observed_at=START,
+        source="test",
+        source_record_id="classic-mint",
+        slot=1,
+        token_program=TOKEN_PROGRAM_ID,
+        account_data_length=82,
         reason_codes=("CLASSIC_SPL_MINT_CONFIRMED",),
     )
 
@@ -74,7 +97,9 @@ class RiskEngineTest(unittest.TestCase):
         self.assertTrue(d.approved)
         self.assertEqual(d.reasons, ())
         self.assertIsNotNone(d.sizing)
-        self.assertLessEqual(d.sizing.risk_amount_quote + d.sizing.estimated_fees_quote, D(10))
+        self.assertLessEqual(
+            d.sizing.risk_amount_quote + d.sizing.estimated_fees_quote, D(10)
+        )
 
     def test_emergency_stop_blocks_before_anything_else(self):
         d = self.evaluate(lim=limits(emergency_stop=True))
@@ -82,8 +107,14 @@ class RiskEngineTest(unittest.TestCase):
         self.assertFalse(d.approved)
 
     def test_stale_portfolio_rejected_both_directions(self):
-        self.assertEqual(self.evaluate(now=START + timedelta(seconds=61)).reasons, ("STALE_PORTFOLIO",))
-        self.assertEqual(self.evaluate(now=START - timedelta(seconds=1)).reasons, ("STALE_PORTFOLIO",))
+        self.assertEqual(
+            self.evaluate(now=START + timedelta(seconds=61)).reasons,
+            ("STALE_PORTFOLIO",),
+        )
+        self.assertEqual(
+            self.evaluate(now=START - timedelta(seconds=1)).reasons,
+            ("STALE_PORTFOLIO",),
+        )
         self.assertTrue(self.evaluate(now=START + timedelta(seconds=60)).approved)
 
     def test_zero_equity_invalid(self):
@@ -92,7 +123,10 @@ class RiskEngineTest(unittest.TestCase):
 
     def test_max_positions_boundary(self):
         pos = tuple(OpenPosition("m", D(1), D(1)) for _ in range(3))
-        self.assertEqual(self.evaluate(port=portfolio(open_positions=pos)).reasons, ("MAX_POSITIONS",))
+        self.assertEqual(
+            self.evaluate(port=portfolio(open_positions=pos)).reasons,
+            ("MAX_POSITIONS",),
+        )
         pos2 = pos[:2]
         self.assertTrue(self.evaluate(port=portfolio(open_positions=pos2)).approved)
 
@@ -107,13 +141,22 @@ class RiskEngineTest(unittest.TestCase):
         self.assertNotIn("COOLDOWN", self.evaluate(port=port2).reasons)
 
     def test_liquidity_spread_and_slippage_gates(self):
-        self.assertIn("LOW_LIQUIDITY", self.evaluate(req=request(liquidity_usd=D(9999))).reasons)
-        self.assertIn("SPREAD_TOO_WIDE", self.evaluate(req=request(spread_pct=D("1.01"))).reasons)
-        self.assertIn("SLIPPAGE_TOO_HIGH", self.evaluate(req=request(slippage_pct=D("1.5"))).reasons)
+        self.assertIn(
+            "LOW_LIQUIDITY", self.evaluate(req=request(liquidity_usd=D(9999))).reasons
+        )
+        self.assertIn(
+            "SPREAD_TOO_WIDE", self.evaluate(req=request(spread_pct=D("1.01"))).reasons
+        )
+        self.assertIn(
+            "SLIPPAGE_TOO_HIGH",
+            self.evaluate(req=request(slippage_pct=D("1.5"))).reasons,
+        )
 
     def test_exposure_limit_uses_notional_not_risk(self):
         # Risk per trade is ~10 but notional is ~100; a 150 cap blocks on exposure, not risk.
-        port = portfolio(open_positions=(OpenPosition("m", D(50), D(2)),))  # 100 open exposure
+        port = portfolio(
+            open_positions=(OpenPosition("m", D(50), D(2)),)
+        )  # 100 open exposure
         d = self.evaluate(port=port, lim=limits(max_exposure_quote=D(150)))
         self.assertIn("EXPOSURE_LIMIT", d.reasons)
         self.assertNotIn("RISK_LIMIT", d.reasons)
@@ -123,9 +166,13 @@ class RiskEngineTest(unittest.TestCase):
             PriceLevels(D(2), D(2), D(3))
 
     def test_multiple_reasons_are_all_reported(self):
-        d = self.evaluate(req=request(liquidity_usd=D(1), slippage_pct=D(9)),
-                          port=portfolio(last_loss_at=START - timedelta(minutes=1)))
-        self.assertEqual(set(d.reasons), {"COOLDOWN", "LOW_LIQUIDITY", "SLIPPAGE_TOO_HIGH"})
+        d = self.evaluate(
+            req=request(liquidity_usd=D(1), slippage_pct=D(9)),
+            port=portfolio(last_loss_at=START - timedelta(minutes=1)),
+        )
+        self.assertEqual(
+            set(d.reasons), {"COOLDOWN", "LOW_LIQUIDITY", "SLIPPAGE_TOO_HIGH"}
+        )
         self.assertFalse(d.approved)
 
     def test_audit_payload_distinguishes_risk_and_exposure(self):
@@ -206,8 +253,13 @@ class RiskConfigurationValidationTest(unittest.TestCase):
                 limits(**overrides)
 
     def test_valid_zero_optional_thresholds_remain_supported(self):
-        configured = limits(min_liquidity_usd=D(0), max_drawdown_pct=D(0),
-                            max_spread_pct=D(0), max_slippage_pct=D(0), fee_rate=D(0))
+        configured = limits(
+            min_liquidity_usd=D(0),
+            max_drawdown_pct=D(0),
+            max_spread_pct=D(0),
+            max_slippage_pct=D(0),
+            fee_rate=D(0),
+        )
         self.assertEqual(configured.min_liquidity_usd, D(0))
 
     def test_trade_request_rejects_non_finite_and_out_of_range_market_data(self):

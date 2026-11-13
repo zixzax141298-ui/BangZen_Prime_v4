@@ -7,9 +7,10 @@ errors are UNAVAILABLE; they must never be interpreted as a clean result.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 from bangzen_prime.domain.tokens import validate_mint
 
@@ -34,7 +35,9 @@ class HoneypotAdapter:
         clock: Callable[[], datetime],
         check_interval_sec: int = 300,
     ) -> None:
-        if isinstance(check_interval_sec, bool) or not isinstance(check_interval_sec, int):
+        if isinstance(check_interval_sec, bool) or not isinstance(
+            check_interval_sec, int
+        ):
             raise ValueError("check_interval_sec must be an integer")
         if check_interval_sec < 1:
             raise ValueError("check_interval_sec must be positive")

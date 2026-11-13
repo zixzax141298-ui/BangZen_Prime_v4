@@ -9,10 +9,13 @@ from bangzen_prime.infrastructure.adapters.market_data.jupiter_price import (
 )
 from bangzen_prime.infrastructure.http import HttpResponse
 from bangzen_prime.infrastructure.resilience.policies import (
-    CircuitBreaker, HealthMonitor, ResilientCaller, RetryPolicy, TokenBucket,
+    CircuitBreaker,
+    HealthMonitor,
+    ResilientCaller,
+    RetryPolicy,
+    TokenBucket,
 )
 from tests.support import SOL_MINT, TOKEN_MINT
-
 
 NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
 
@@ -25,6 +28,7 @@ class FakeTransport:
     def __call__(self, request):
         self.requests.append(request)
         import json
+
         return HttpResponse(200, json.dumps(self.payload).encode(), {})
 
 
@@ -33,22 +37,35 @@ def caller():
         "jupiter_price_v3",
         retry=RetryPolicy(max_attempts=1),
         limiter=TokenBucket(rate_per_minute=600, capacity=10),
-        breaker=CircuitBreaker("jupiter_price_v3", failure_threshold=3, recovery_seconds=1),
+        breaker=CircuitBreaker(
+            "jupiter_price_v3", failure_threshold=3, recovery_seconds=1
+        ),
         health=HealthMonitor(),
         sleep=lambda _seconds: None,
     )
 
 
-def payload(*, target_slot=990, quote_slot=995, target_price="0.02",
-            quote_price="100", target_liquidity="50000", quote_liquidity="900000"):
+def payload(
+    *,
+    target_slot=990,
+    quote_slot=995,
+    target_price="0.02",
+    quote_price="100",
+    target_liquidity="50000",
+    quote_liquidity="900000",
+):
     return {
         TOKEN_MINT: {
-            "usdPrice": target_price, "liquidity": target_liquidity,
-            "blockId": target_slot, "decimals": 6,
+            "usdPrice": target_price,
+            "liquidity": target_liquidity,
+            "blockId": target_slot,
+            "decimals": 6,
         },
         SOL_MINT: {
-            "usdPrice": quote_price, "liquidity": quote_liquidity,
-            "blockId": quote_slot, "decimals": 9,
+            "usdPrice": quote_price,
+            "liquidity": quote_liquidity,
+            "blockId": quote_slot,
+            "decimals": 9,
         },
     }
 
@@ -74,7 +91,7 @@ class JupiterPriceEvidenceAdapterTests(unittest.TestCase):
         self.assertEqual(result.evidence.validation_status, "VERIFIED")
         self.assertEqual(result.target_block_slot, 990)
         self.assertEqual(result.quote_block_slot, 995)
-        self.assertEqual(result.target_liquidity_usd, Decimal("50000"))
+        self.assertEqual(result.target_liquidity_usd, Decimal(50000))
         self.assertEqual(result.evidence.slot, 990)
         self.assertIn("ids=", transport.requests[0].url)
         self.assertEqual(transport.requests[0].headers["x-api-key"], "test-secret")
@@ -120,9 +137,13 @@ class JupiterPriceEvidenceAdapterTests(unittest.TestCase):
         with self.assertRaises(DomainError):
             adapter.fetch_quote_price(mint=TOKEN_MINT, quote_mint=SOL_MINT)
         adapter = JupiterPriceEvidenceAdapter(
-            api_key="key", transport=FakeTransport(payload()), caller=caller(),
-            timeout=2, current_slot=lambda: 1000,
-            clock=lambda: datetime(2026, 11, 13), max_slot_lag=20,
+            api_key="key",
+            transport=FakeTransport(payload()),
+            caller=caller(),
+            timeout=2,
+            current_slot=lambda: 1000,
+            clock=lambda: datetime(2026, 11, 13),
+            max_slot_lag=20,
         )
         with self.assertRaises(DomainError):
             adapter.fetch_quote_price(mint=TOKEN_MINT, quote_mint=SOL_MINT)
@@ -133,8 +154,13 @@ class JupiterPriceEvidenceAdapterTests(unittest.TestCase):
             adapter.fetch_quote_price(mint=SOL_MINT, quote_mint=SOL_MINT)
         with self.assertRaises(DomainError):
             JupiterPriceEvidenceAdapter(
-                api_key="key", transport=FakeTransport(payload()), caller=caller(),
-                timeout=2, current_slot=lambda: 1000, clock=lambda: NOW, max_slot_lag=-1,
+                api_key="key",
+                transport=FakeTransport(payload()),
+                caller=caller(),
+                timeout=2,
+                current_slot=lambda: 1000,
+                clock=lambda: NOW,
+                max_slot_lag=-1,
             )
 
     def test_rejects_malformed_provider_payload(self):
@@ -146,8 +172,13 @@ class JupiterPriceEvidenceAdapterTests(unittest.TestCase):
     def test_rejects_missing_or_blank_api_key(self):
         with self.assertRaises(DomainError):
             JupiterPriceEvidenceAdapter(
-                api_key="", transport=FakeTransport(payload()), caller=caller(),
-                timeout=2, current_slot=lambda: 1000, clock=lambda: NOW, max_slot_lag=20,
+                api_key="",
+                transport=FakeTransport(payload()),
+                caller=caller(),
+                timeout=2,
+                current_slot=lambda: 1000,
+                clock=lambda: NOW,
+                max_slot_lag=20,
             )
 
 

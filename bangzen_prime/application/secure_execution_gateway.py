@@ -27,8 +27,7 @@ import threading
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import UTC, datetime
 from typing import Any
 
 from bangzen_prime.application.mode_controller import ModeController
@@ -92,7 +91,7 @@ class SecureExecutionGateway:
         self._mode = mode_controller
         self._paper = paper
         self._db = db
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
         self._emergency_stop = emergency_stop or (lambda: bool(settings.emergency_stop))
         self._lock = threading.RLock()
         self._assert_settings_locked_to_paper()
@@ -105,9 +104,7 @@ class SecureExecutionGateway:
                 "SecureExecutionGateway requires paper_trading=true and dry_run=true"
             )
         if s.live_trading:
-            raise ConfigurationError(
-                "SecureExecutionGateway refuses live_trading=true"
-            )
+            raise ConfigurationError("SecureExecutionGateway refuses live_trading=true")
         if s.broadcast_enabled:
             raise ConfigurationError(
                 "SecureExecutionGateway refuses broadcast_enabled=true"
@@ -181,7 +178,11 @@ class SecureExecutionGateway:
                 mode=mode,
                 action="OPEN" if outcome.order is not None else "REJECT",
                 reason_codes=outcome.decision.reasons
-                or (("OPENED",) if outcome.order is not None else ("RISK_OR_SIGNAL_DENIED",)),
+                or (
+                    ("OPENED",)
+                    if outcome.order is not None
+                    else ("RISK_OR_SIGNAL_DENIED",)
+                ),
                 signal_id=str(signal_id),
                 order_id=order_id,
                 decided_at=now,

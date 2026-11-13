@@ -13,8 +13,15 @@ from urllib.parse import quote
 
 from bangzen_prime.application.ports import MarketSentimentObservation
 from bangzen_prime.errors import DomainError
-from bangzen_prime.infrastructure.adapters.market_data.parsing import MalformedData, to_decimal
-from bangzen_prime.infrastructure.http import HttpRequest, RequestTransport, request_json
+from bangzen_prime.infrastructure.adapters.market_data.parsing import (
+    MalformedData,
+    to_decimal,
+)
+from bangzen_prime.infrastructure.http import (
+    HttpRequest,
+    RequestTransport,
+    request_json,
+)
 from bangzen_prime.infrastructure.resilience.policies import ResilientCaller
 
 BASE_URL = "https://lunarcrush.com/api4"
@@ -71,7 +78,9 @@ class LunarCrushSentimentAdapter:
             self._timeout,
         )
         payload = self._caller.call(
-            lambda: request_json(service=self.SERVICE, request=request, transport=self._transport)
+            lambda: request_json(
+                service=self.SERVICE, request=request, transport=self._transport
+            )
         )
         snapshot = self._parse(payload, now)
         self._cached = snapshot
@@ -96,7 +105,9 @@ class LunarCrushSentimentAdapter:
             raise MalformedData(self.SERVICE, "generated timestamp invalid") from None
         age = (now - generated_at).total_seconds()
         if age < -60 or age > self._max_age:
-            raise MalformedData(self.SERVICE, "sentiment snapshot is stale or future-dated")
+            raise MalformedData(
+                self.SERVICE, "sentiment snapshot is stale or future-dated"
+            )
 
         sentiments = data.get("types_sentiment")
         interactions = data.get("types_interactions")
@@ -107,8 +118,12 @@ class LunarCrushSentimentAdapter:
         for network, raw_sentiment in sentiments.items():
             if network not in interactions:
                 continue
-            sentiment = to_decimal(raw_sentiment, service=self.SERVICE, field="sentiment")
-            weight = to_decimal(interactions[network], service=self.SERVICE, field="interactions")
+            sentiment = to_decimal(
+                raw_sentiment, service=self.SERVICE, field="sentiment"
+            )
+            weight = to_decimal(
+                interactions[network], service=self.SERVICE, field="interactions"
+            )
             if not Decimal(0) <= sentiment <= Decimal(100) or weight < 0:
                 raise MalformedData(self.SERVICE, "sentiment values out of range")
             weighted += sentiment * weight

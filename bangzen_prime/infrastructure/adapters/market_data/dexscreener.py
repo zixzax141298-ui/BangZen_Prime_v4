@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from urllib.parse import quote
-
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 from bangzen_prime.domain.tokens import PairSnapshot, validate_chain, validate_mint
 from bangzen_prime.errors import DomainError
@@ -24,8 +23,15 @@ SERVICE = "dexscreener"
 
 
 class DexScreenerAdapter:
-    def __init__(self, *, base_url: str, transport: Transport, caller: ResilientCaller,
-                 timeout: float, clock: Callable[[], datetime]) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        transport: Transport,
+        caller: ResilientCaller,
+        timeout: float,
+        clock: Callable[[], datetime],
+    ) -> None:
         self._base = base_url.rstrip("/")
         self._transport = transport
         self._caller = caller
@@ -36,8 +42,14 @@ class DexScreenerAdapter:
         validate_chain(chain)
         validate_mint(mint)
         url = f"{self._base}/token-pairs/v1/{quote(chain, safe='')}/{quote(mint, safe='')}"
-        data = self._caller.call(lambda: get_json(service=SERVICE, url=url,
-                                                  timeout=self._timeout, transport=self._transport))
+        data = self._caller.call(
+            lambda: get_json(
+                service=SERVICE,
+                url=url,
+                timeout=self._timeout,
+                transport=self._transport,
+            )
+        )
         if not isinstance(data, list):
             raise MalformedData(SERVICE, "expected a list of pairs")
         now = self._clock()
@@ -49,7 +61,9 @@ class DexScreenerAdapter:
             except (MalformedData, DomainError):
                 skipped += 1
         if skipped:
-            logger.warning("dexscreener skipped %d malformed or foreign pair entries", skipped)
+            logger.warning(
+                "dexscreener skipped %d malformed or foreign pair entries", skipped
+            )
         return snapshots
 
     @staticmethod
@@ -83,13 +97,21 @@ class DexScreenerAdapter:
         try:
             return PairSnapshot.create(
                 chain=chain,
-                pair_address=require_str(item.get("pairAddress"), service=SERVICE, field="pairAddress"),
+                pair_address=require_str(
+                    item.get("pairAddress"), service=SERVICE, field="pairAddress"
+                ),
                 dex_id=require_str(item.get("dexId"), service=SERVICE, field="dexId"),
                 base_mint=mint,
                 base_symbol=str(base.get("symbol") or "UNKNOWN")[:32],
-                price_usd=to_decimal(item.get("priceUsd"), service=SERVICE, field="priceUsd"),
-                liquidity_usd=to_decimal(liquidity.get("usd", 0), service=SERVICE, field="liquidity.usd"),
-                volume_24h_usd=to_decimal(volume.get("h24", 0), service=SERVICE, field="volume.h24"),
+                price_usd=to_decimal(
+                    item.get("priceUsd"), service=SERVICE, field="priceUsd"
+                ),
+                liquidity_usd=to_decimal(
+                    liquidity.get("usd", 0), service=SERVICE, field="liquidity.usd"
+                ),
+                volume_24h_usd=to_decimal(
+                    volume.get("h24", 0), service=SERVICE, field="volume.h24"
+                ),
                 observed_at=now,
                 pair_created_at=DexScreenerAdapter._pair_created_at(item),
                 source="DexScreener",

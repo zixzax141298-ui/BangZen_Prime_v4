@@ -23,8 +23,14 @@ class ProviderBudget:
     _stamps: deque = field(default_factory=deque, repr=False)
 
     def __post_init__(self) -> None:
-        if not self.name or not isinstance(self.calls_per_minute, int) or isinstance(self.calls_per_minute, bool):
-            raise ConfigurationError("budget needs a name and an integer calls_per_minute")
+        if (
+            not self.name
+            or not isinstance(self.calls_per_minute, int)
+            or isinstance(self.calls_per_minute, bool)
+        ):
+            raise ConfigurationError(
+                "budget needs a name and an integer calls_per_minute"
+            )
         if self.calls_per_minute <= 0:
             raise ConfigurationError("calls_per_minute must be positive")
 
@@ -45,7 +51,9 @@ class ProviderBudget:
 
 
 class BudgetRegistry:
-    def __init__(self, budgets: list[ProviderBudget], clock: Callable[[], float]) -> None:
+    def __init__(
+        self, budgets: list[ProviderBudget], clock: Callable[[], float]
+    ) -> None:
         names = [b.name for b in budgets]
         if len(names) != len(set(names)):
             raise ConfigurationError("duplicate provider budget")

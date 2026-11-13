@@ -12,15 +12,21 @@ from bangzen_prime.interfaces.demo import run_demo
 
 def run_cli(argv, env=None):
     out, err = io.StringIO(), io.StringIO()
-    with mock.patch.dict(os.environ, env or {}, clear=True), \
-            contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+    with (
+        mock.patch.dict(os.environ, env or {}, clear=True),
+        contextlib.redirect_stdout(out),
+        contextlib.redirect_stderr(err),
+    ):
         code = main(argv)
     return code, out.getvalue(), err.getvalue()
 
 
 class CliTest(unittest.TestCase):
     def test_help_exits_zero_and_lists_commands(self):
-        with self.assertRaises(SystemExit) as ctx, contextlib.redirect_stdout(io.StringIO()) as out:
+        with (
+            self.assertRaises(SystemExit) as ctx,
+            contextlib.redirect_stdout(io.StringIO()) as out,
+        ):
             main(["--help"])
         self.assertEqual(ctx.exception.code, 0)
         text = out.getvalue()
@@ -35,7 +41,9 @@ class CliTest(unittest.TestCase):
         self.assertFalse(data["live_trading"])
         self.assertTrue(data["paper_trading"])
         self.assertTrue(data["dry_run"])
-        self.assertNotIn("token", json.dumps(data).lower().replace("telegram_configured", ""))
+        self.assertNotIn(
+            "token", json.dumps(data).lower().replace("telegram_configured", "")
+        )
 
     def test_invalid_config_exits_nonzero_with_message(self):
         code, _, err = run_cli(["status"], {"BANGZEN_LIVE_TRADING": "true"})

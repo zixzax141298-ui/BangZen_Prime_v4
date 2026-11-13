@@ -29,7 +29,9 @@ class TelegramNotifier:
         if not isinstance(token, str) or not token or any(ch.isspace() for ch in token):
             raise ValueError("Telegram bot token is invalid")
         if isinstance(chat_ids, str):
-            raise ValueError("Telegram chat IDs must be provided as a sequence, not a string")
+            raise ValueError(
+                "Telegram chat IDs must be provided as a sequence, not a string"
+            )
         ids = tuple(chat_ids)
         if not ids or any(
             not isinstance(chat_id, str) or not re.fullmatch(r"-?[0-9]+", chat_id)

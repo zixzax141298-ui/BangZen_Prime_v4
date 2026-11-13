@@ -35,18 +35,24 @@ def _call(name: str, rust_call, python_call):
 def min_out_amount(out_amount: int, slippage_bps: int) -> int:
     if out_amount < 0 or not (0 <= slippage_bps <= BPS_SCALE):
         raise ValueError("invalid amount or slippage")
-    return _call("min_out_amount",
-                 lambda: _rust.min_out_amount(out_amount, slippage_bps),
-                 lambda: out_amount * (BPS_SCALE - slippage_bps) // BPS_SCALE)
+    return _call(
+        "min_out_amount",
+        lambda: _rust.min_out_amount(out_amount, slippage_bps),
+        lambda: out_amount * (BPS_SCALE - slippage_bps) // BPS_SCALE,
+    )
 
 
 def bundle_within_limits(num_txs: int, tip_lamports: int, cap_lamports: int) -> bool:
-    return _call("bundle_within_limits",
-                 lambda: _rust.bundle_within_limits(num_txs, tip_lamports, cap_lamports),
-                 lambda: 1 <= num_txs <= 5 and 0 <= tip_lamports <= cap_lamports)
+    return _call(
+        "bundle_within_limits",
+        lambda: _rust.bundle_within_limits(num_txs, tip_lamports, cap_lamports),
+        lambda: 1 <= num_txs <= 5 and 0 <= tip_lamports <= cap_lamports,
+    )
 
 
 def html_escape(text: str) -> str:
-    return _call("html_escape",
-                 lambda: _rust.html_escape(text),
-                 lambda: html.escape(text, quote=False))
+    return _call(
+        "html_escape",
+        lambda: _rust.html_escape(text),
+        lambda: html.escape(text, quote=False),
+    )

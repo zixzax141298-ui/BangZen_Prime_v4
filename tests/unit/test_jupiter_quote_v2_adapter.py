@@ -67,17 +67,17 @@ class JupiterQuoteV2Tests(unittest.TestCase):
         self.assertIn("/order?", request.url)
         self.assertNotIn("taker=", request.url)
         self.assertEqual(request.headers["x-api-key"], "test-key")
-        self.assertEqual(quote.input_amount_raw, Decimal("1000000000"))
-        self.assertEqual(quote.output_amount_raw, Decimal("25000000"))
+        self.assertEqual(quote.input_amount_raw, Decimal(1000000000))
+        self.assertEqual(quote.output_amount_raw, Decimal(25000000))
         self.assertEqual(quote.total_fee_bps, 12)
-        self.assertEqual(quote.platform_fee.amount_raw, Decimal("1000000"))
+        self.assertEqual(quote.platform_fee.amount_raw, Decimal(1000000))
 
     def test_quote_accepts_empty_transaction_quote_only_response(self):
         recorder = RequestRecorder([response(self.payload(transaction=""))])
         quote = self.adapter(recorder).quote(
             input_mint=SOL_MINT, output_mint=TOKEN_MINT, amount=1_000_000_000
         )
-        self.assertEqual(quote.output_amount_raw, Decimal("25000000"))
+        self.assertEqual(quote.output_amount_raw, Decimal(25000000))
 
     def test_quote_rejects_transaction_payload(self):
         recorder = RequestRecorder([response(self.payload(transaction="unsigned-tx"))])
@@ -97,7 +97,9 @@ class JupiterQuoteV2Tests(unittest.TestCase):
                 recorder = RequestRecorder([response(self.payload(**changes))])
                 with self.assertRaises(ExternalServiceError):
                     self.adapter(recorder).quote(
-                        input_mint=SOL_MINT, output_mint=TOKEN_MINT, amount=1_000_000_000
+                        input_mint=SOL_MINT,
+                        output_mint=TOKEN_MINT,
+                        amount=1_000_000_000,
                     )
 
     def test_quote_rejects_invalid_fee_metadata(self):
@@ -106,11 +108,15 @@ class JupiterQuoteV2Tests(unittest.TestCase):
                 recorder = RequestRecorder([response(self.payload(**changes))])
                 with self.assertRaises(ExternalServiceError):
                     self.adapter(recorder).quote(
-                        input_mint=SOL_MINT, output_mint=TOKEN_MINT, amount=1_000_000_000
+                        input_mint=SOL_MINT,
+                        output_mint=TOKEN_MINT,
+                        amount=1_000_000_000,
                     )
 
     def test_quote_rejects_malformed_platform_fee(self):
-        recorder = RequestRecorder([response(self.payload(platformFee={"amount": "NaN"}))])
+        recorder = RequestRecorder(
+            [response(self.payload(platformFee={"amount": "NaN"}))]
+        )
         with self.assertRaises(ExternalServiceError):
             self.adapter(recorder).quote(
                 input_mint=SOL_MINT, output_mint=TOKEN_MINT, amount=1_000_000_000

@@ -7,12 +7,10 @@ import random
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import TypeVar
-
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Protocol
+from enum import Enum
+from typing import Protocol, TypeVar
 
 from bangzen_prime.application.heartbeat import EmergencyLatch
 from bangzen_prime.domain.shared import ensure_utc
@@ -45,7 +43,9 @@ class ResiliencePolicy:
     max_attempts: int = 3
     base_backoff_seconds: float = 0.25
     max_backoff_seconds: float = 5.0
-    retryable_status_codes: frozenset[int] = frozenset({408, 425, 429, 500, 502, 503, 504})
+    retryable_status_codes: frozenset[int] = frozenset(
+        {408, 425, 429, 500, 502, 503, 504}
+    )
 
 
 @dataclass
@@ -69,7 +69,9 @@ class CircuitBreaker:
                 if time.monotonic() - self._opened_at < self.policy.recovery_seconds:
                     if fallback is None:
                         raise CircuitOpenError(f"{self.name} circuit is open")
-                    return await fallback(CircuitOpenError(f"{self.name} circuit is open"))
+                    return await fallback(
+                        CircuitOpenError(f"{self.name} circuit is open")
+                    )
                 self.state = CircuitState.HALF_OPEN
                 self._half_open_successes = 0
 
@@ -192,7 +194,7 @@ class ReconciliationWorker:
             raise ValueError("an owner address is required")
         if not isinstance(tolerance_pct, Decimal) or not tolerance_pct.is_finite():
             raise ValueError("tolerance must be a finite Decimal")
-        if not Decimal("0") <= tolerance_pct <= Decimal("100"):
+        if not Decimal(0) <= tolerance_pct <= Decimal(100):
             raise ValueError("tolerance must be within [0, 100] percent")
         self._db = db
         self._balances = balances
@@ -209,7 +211,7 @@ class ReconciliationWorker:
             f" WHERE t.mint = ? AND o.status IN ({placeholders})",
             (mint, *OPEN_STATUSES),
         )
-        total = Decimal("0")
+        total = Decimal(0)
         for row in rows:
             total += Decimal(str(row["units"]))
         return total
@@ -217,25 +219,35 @@ class ReconciliationWorker:
     def run_once(self, mint: str, at: datetime) -> ReconciliationResult:
         at = ensure_utc(at)
         if self._balances is None:
-            return ReconciliationResult(STATUS_NOT_CONFIGURED, mint, None, None, "NOT_CONFIGURED")
+            return ReconciliationResult(
+                STATUS_NOT_CONFIGURED, mint, None, None, "NOT_CONFIGURED"
+            )
 
         expected = self.expected_units(mint)
         try:
             observed = self._balances.token_balance(self._owner, mint)
         except ExternalServiceError:
-            return ReconciliationResult(STATUS_UNAVAILABLE, mint, expected, None, "BALANCE_UNAVAILABLE")
+            return ReconciliationResult(
+                STATUS_UNAVAILABLE, mint, expected, None, "BALANCE_UNAVAILABLE"
+            )
 
         if not isinstance(observed, Decimal):
             try:
                 observed = Decimal(str(observed))
             except (InvalidOperation, ValueError):
-                return ReconciliationResult(STATUS_UNAVAILABLE, mint, expected, None, "BALANCE_INVALID")
+                return ReconciliationResult(
+                    STATUS_UNAVAILABLE, mint, expected, None, "BALANCE_INVALID"
+                )
         if not observed.is_finite() or observed < 0:
-            return ReconciliationResult(STATUS_UNAVAILABLE, mint, expected, None, "BALANCE_INVALID")
+            return ReconciliationResult(
+                STATUS_UNAVAILABLE, mint, expected, None, "BALANCE_INVALID"
+            )
 
-        allowed = expected * self._tolerance / Decimal("100")
+        allowed = expected * self._tolerance / Decimal(100)
         if abs(observed - expected) <= allowed:
-            return ReconciliationResult(STATUS_OK, mint, expected, observed, "WITHIN_TOLERANCE")
+            return ReconciliationResult(
+                STATUS_OK, mint, expected, observed, "WITHIN_TOLERANCE"
+            )
 
         reason = f"RECONCILIATION_MISMATCH:{mint[:8]}"
         self._latch.trigger(reason, at)

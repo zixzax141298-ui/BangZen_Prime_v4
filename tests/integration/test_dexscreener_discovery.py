@@ -8,10 +8,14 @@ from bangzen_prime.infrastructure.adapters.market_data.dexscreener_discovery imp
 )
 from bangzen_prime.infrastructure.http import HttpResponse
 from bangzen_prime.infrastructure.resilience.policies import (
-    CircuitBreaker, FakeClock, HealthMonitor, ResilientCaller, RetryPolicy, TokenBucket,
+    CircuitBreaker,
+    FakeClock,
+    HealthMonitor,
+    ResilientCaller,
+    RetryPolicy,
+    TokenBucket,
 )
 from tests.support import START, TOKEN_MINT, RecordingTransport, json_response
-
 
 BASE = "https://api.dexscreener.com"
 
@@ -47,9 +51,7 @@ class DexScreenerDiscoveryTest(unittest.TestCase):
         adapter, transport = self.adapter(lambda url: json_response(payload))
 
         self.assertEqual(adapter.fetch_candidates(limit=5), [TOKEN_MINT])
-        self.assertEqual(
-            transport.calls, [f"{BASE}/token-profiles/latest/v1"]
-        )
+        self.assertEqual(transport.calls, [f"{BASE}/token-profiles/latest/v1"])
 
     def test_caps_candidates_to_requested_limit(self):
         second = "So11111111111111111111111111111111111111112"

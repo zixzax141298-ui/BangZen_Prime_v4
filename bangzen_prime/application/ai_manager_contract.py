@@ -3,14 +3,15 @@
 This module is deliberately provider- and model-agnostic. It does not fetch data,
 call an LLM, execute a strategy, or authorize an order.
 """
+
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
-from typing import Any, Mapping
-
+from typing import Any
 
 CONTRACT_VERSION = "1.0"
 POLICY_VERSION = "13.0"
@@ -55,7 +56,7 @@ def _timestamp(value: object, field: str) -> datetime:
         raise ContractError(f"{field} is invalid") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ContractError(f"{field} must include a timezone")
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _decimal(value: object, field: str) -> Decimal:
@@ -86,18 +87,31 @@ class EvidenceRecord:
     reason_codes: tuple[str, ...]
 
     @classmethod
-    def from_mapping(cls, raw: Mapping[str, Any]) -> "EvidenceRecord":
+    def from_mapping(cls, raw: Mapping[str, Any]) -> EvidenceRecord:
         if not isinstance(raw, Mapping):
             raise ContractError("evidence item must be an object")
         expected = {
-            "evidence_id", "subject", "evidence_type", "observed_at", "received_at",
-            "source", "source_record_id", "freshness_seconds", "completeness",
-            "validation_status", "confidence_basis", "reason_codes",
+            "evidence_id",
+            "subject",
+            "evidence_type",
+            "observed_at",
+            "received_at",
+            "source",
+            "source_record_id",
+            "freshness_seconds",
+            "completeness",
+            "validation_status",
+            "confidence_basis",
+            "reason_codes",
         }
         if set(raw) != expected:
             raise ContractError("evidence item has missing or unknown fields")
         freshness = raw["freshness_seconds"]
-        if isinstance(freshness, bool) or not isinstance(freshness, int) or freshness < 0:
+        if (
+            isinstance(freshness, bool)
+            or not isinstance(freshness, int)
+            or freshness < 0
+        ):
             raise ContractError("freshness_seconds must be a non-negative integer")
         completeness = _decimal(raw["completeness"], "completeness")
         if not Decimal(0) <= completeness <= Decimal(1):
@@ -121,7 +135,9 @@ class EvidenceRecord:
             freshness_seconds=freshness,
             completeness=completeness,
             validation_status=status,
-            confidence_basis=_non_empty(raw["confidence_basis"], "confidence_basis", 512),
+            confidence_basis=_non_empty(
+                raw["confidence_basis"], "confidence_basis", 512
+            ),
             reason_codes=reason_codes,
         )
 
@@ -138,7 +154,7 @@ class EvidenceRecord:
             return False
         if now.tzinfo is None or now.utcoffset() is None:
             return False
-        now_utc = now.astimezone(timezone.utc)
+        now_utc = now.astimezone(UTC)
         age = (now_utc - self.observed_at).total_seconds()
         received_age = (now_utc - self.received_at).total_seconds()
         return (
@@ -156,9 +172,12 @@ class EvidencePackage:
     evidence: tuple[EvidenceRecord, ...]
 
     @classmethod
-    def from_mapping(cls, raw: Mapping[str, Any]) -> "EvidencePackage":
+    def from_mapping(cls, raw: Mapping[str, Any]) -> EvidencePackage:
         if not isinstance(raw, Mapping) or set(raw) != {
-            "schema_version", "subject", "collected_at", "evidence"
+            "schema_version",
+            "subject",
+            "collected_at",
+            "evidence",
         }:
             raise ContractError("evidence package has missing or unknown fields")
         if raw["schema_version"] != CONTRACT_VERSION:
@@ -184,7 +203,8 @@ class EvidencePackage:
         self, *, max_age_seconds: int, now: datetime
     ) -> tuple[EvidenceRecord, ...]:
         return tuple(
-            item for item in self.evidence
+            item
+            for item in self.evidence
             if item.is_eligible(max_age_seconds=max_age_seconds, now=now)
         )
 
@@ -200,7 +220,10 @@ class WeaponSpec:
         _non_empty(self.weapon_id, "weapon_id")
         if not self.required_evidence:
             raise ContractError("weapon must declare required evidence")
-        if any(not isinstance(item, str) or not item.strip() for item in self.required_evidence):
+        if any(
+            not isinstance(item, str) or not item.strip()
+            for item in self.required_evidence
+        ):
             raise ContractError("weapon evidence requirements are invalid")
         if isinstance(self.priority, bool) or not isinstance(self.priority, int):
             raise ContractError("weapon priority must be an integer")
@@ -239,7 +262,8 @@ class WeaponRegistry:
             )
         }
         eligible = [
-            weapon for weapon in self._weapons.values()
+            weapon
+            for weapon in self._weapons.values()
             if weapon.enabled and weapon.required_evidence.issubset(available_types)
         ]
         if not eligible:
@@ -288,7 +312,10 @@ class AIManagerDecision:
             raise ContractError("unsupported policy_version")
         if self.action is DecisionAction.BUY_CANDIDATE and not self.selected_weapon:
             raise ContractError("BUY_CANDIDATE requires exactly one selected_weapon")
-        if self.action is not DecisionAction.BUY_CANDIDATE and self.selected_weapon is not None:
+        if (
+            self.action is not DecisionAction.BUY_CANDIDATE
+            and self.selected_weapon is not None
+        ):
             raise ContractError("HOLD/SKIP cannot select a weapon")
         if self.action is DecisionAction.BUY_CANDIDATE and not self.evidence_refs:
             raise ContractError("BUY_CANDIDATE requires evidence_refs")
@@ -300,16 +327,23 @@ class AIManagerDecision:
             self.created_at.tzinfo is None or self.created_at.utcoffset() is None
         ):
             raise ContractError("created_at must include a timezone")
-        if self.action is DecisionAction.BUY_CANDIDATE and self.data_quality is not ValidationStatus.VERIFIED:
+        if (
+            self.action is DecisionAction.BUY_CANDIDATE
+            and self.data_quality is not ValidationStatus.VERIFIED
+        ):
             raise ContractError("BUY_CANDIDATE requires VERIFIED data_quality")
 
     @classmethod
     def hold(
-        cls, *, decision_id: str, subject: str, reason_code: str,
+        cls,
+        *,
+        decision_id: str,
+        subject: str,
+        reason_code: str,
         data_quality: ValidationStatus = ValidationStatus.UNAVAILABLE,
         evidence_refs: tuple[str, ...] = (),
         created_at: datetime | None = None,
-    ) -> "AIManagerDecision":
+    ) -> AIManagerDecision:
         return cls(
             decision_id=decision_id,
             schema_version=CONTRACT_VERSION,
@@ -321,5 +355,5 @@ class AIManagerDecision:
             reason_codes=(reason_code,),
             data_quality=data_quality,
             policy_version=POLICY_VERSION,
-            created_at=created_at or datetime.now(timezone.utc),
+            created_at=created_at or datetime.now(UTC),
         )

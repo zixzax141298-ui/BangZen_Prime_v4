@@ -31,8 +31,11 @@ class DiscoveryRetryTests(unittest.TestCase):
                 now = [10.0]
                 scanner = Scanner((reason,))
                 discovery = ContinuousDiscoveryUseCase(
-                    feed=Feed(), scanner=scanner, clock=lambda: now[0],
-                    dedupe_seconds=1800, retry_seconds=60,
+                    feed=Feed(),
+                    scanner=scanner,
+                    clock=lambda: now[0],
+                    dedupe_seconds=1800,
+                    retry_seconds=60,
                 )
                 discovery.execute()
                 now[0] = 69.0
@@ -45,8 +48,11 @@ class DiscoveryRetryTests(unittest.TestCase):
         now = [10.0]
         scanner = Scanner(("RUGGED",))
         discovery = ContinuousDiscoveryUseCase(
-            feed=Feed(), scanner=scanner, clock=lambda: now[0],
-            dedupe_seconds=1800, retry_seconds=60,
+            feed=Feed(),
+            scanner=scanner,
+            clock=lambda: now[0],
+            dedupe_seconds=1800,
+            retry_seconds=60,
         )
         discovery.execute()
         now[0] = 70.0

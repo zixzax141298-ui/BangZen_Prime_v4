@@ -4,21 +4,32 @@ from datetime import timedelta
 from decimal import Decimal
 
 from bangzen_prime.application.ai_brain import AIBrain, TradeContext
-from bangzen_prime.application.reconciliation import ReconciliationWorker
 from bangzen_prime.application.heartbeat import EmergencyLatch
+from bangzen_prime.application.reconciliation import ReconciliationWorker
 from bangzen_prime.errors import ConfigurationError, DomainError, ExternalServiceError
-from bangzen_prime.infrastructure.adapters.chain.helius import BroadcastRefused, HeliusRpc
+from bangzen_prime.infrastructure.adapters.chain.helius import (
+    BroadcastRefused,
+    HeliusRpc,
+)
 from bangzen_prime.infrastructure.adapters.chain.jito import JitoClient
 from bangzen_prime.infrastructure.adapters.chain.jupiter import JupiterQuoteAdapter
-from bangzen_prime.infrastructure.adapters.market_data.intel import BirdeyeAdapter, SolanaTrackerAdapter
-from bangzen_prime.infrastructure.chain.grpc_stream import YellowstoneStream
+from bangzen_prime.infrastructure.adapters.market_data.intel import (
+    BirdeyeAdapter,
+    SolanaTrackerAdapter,
+)
 from bangzen_prime.infrastructure.ai.providers import build_provider
+from bangzen_prime.infrastructure.chain.grpc_stream import YellowstoneStream
 from bangzen_prime.infrastructure.http import HttpResponse, TransportTimeout
 from bangzen_prime.infrastructure.persistence.sqlite.database import Database
 from bangzen_prime.infrastructure.resilience.policies import (
-    CircuitBreaker, FakeClock, HealthMonitor, ResilientCaller, RetryPolicy, TokenBucket,
+    CircuitBreaker,
+    FakeClock,
+    HealthMonitor,
+    ResilientCaller,
+    RetryPolicy,
+    TokenBucket,
 )
-from tests.support import START, TOKEN_MINT, SOL_MINT
+from tests.support import SOL_MINT, START, TOKEN_MINT
 
 OWNER = "HxFLKUAmAMLz1jtT3hbvCMELwH5H9tpM2QugP8sKyfhc"
 TIP_ACCOUNT = "TipAccount11111111111111111111111111111111"
@@ -42,25 +53,48 @@ def ok(payload, status=200, headers=None):
 
 
 def caller(clock, sleeps=None):
-    return ResilientCaller("svc", retry=RetryPolicy(max_attempts=2, base_delay_seconds=0),
-                           limiter=TokenBucket(rate_per_minute=6000, clock=clock),
-                           breaker=CircuitBreaker("svc", clock=clock), health=HealthMonitor(),
-                           sleep=(sleeps if sleeps is not None else []).append, clock=clock)
+    return ResilientCaller(
+        "svc",
+        retry=RetryPolicy(max_attempts=2, base_delay_seconds=0),
+        limiter=TokenBucket(rate_per_minute=6000, clock=clock),
+        breaker=CircuitBreaker("svc", clock=clock),
+        health=HealthMonitor(),
+        sleep=(sleeps if sleeps is not None else []).append,
+        clock=clock,
+    )
 
 
 class BirdeyeTest(unittest.TestCase):
     def make(self, handler):
         clock = FakeClock(START)
         rec = Recorder(handler)
-        return BirdeyeAdapter(api_key="BIRDKEY", transport=rec, caller=caller(clock), timeout=5,
-                              clock=clock.now), rec
+        return (
+            BirdeyeAdapter(
+                api_key="BIRDKEY",
+                transport=rec,
+                caller=caller(clock),
+                timeout=5,
+                clock=clock.now,
+            ),
+            rec,
+        )
 
     def test_overview_parsed_with_verified_headers_and_url(self):
-        adapter, rec = self.make(lambda r: ok({"data": {"symbol": "ABC", "liquidity": 120000,
-                                                        "v24hUSD": 300000, "price": 0.0012}}))
+        adapter, rec = self.make(
+            lambda r: ok(
+                {
+                    "data": {
+                        "symbol": "ABC",
+                        "liquidity": 120000,
+                        "v24hUSD": 300000,
+                        "price": 0.0012,
+                    }
+                }
+            )
+        )
         intel = adapter.token_intel("solana", TOKEN_MINT)
-        self.assertEqual(intel.liquidity_usd, Decimal("120000"))
-        self.assertEqual(intel.volume_24h_usd, Decimal("300000"))
+        self.assertEqual(intel.liquidity_usd, Decimal(120000))
+        self.assertEqual(intel.volume_24h_usd, Decimal(300000))
         req = rec.requests[0]
         self.assertEqual(req.method, "GET")
         self.assertIn("/defi/token_overview?address=" + TOKEN_MINT, req.url)
@@ -74,7 +108,9 @@ class BirdeyeTest(unittest.TestCase):
             adapter.token_intel("solana", TOKEN_MINT)
 
     def test_non_numeric_and_nan_rejected(self):
-        adapter, _ = self.make(lambda r: ok({"data": {"liquidity": "NaN", "v24hUSD": 1, "price": 1}}))
+        adapter, _ = self.make(
+            lambda r: ok({"data": {"liquidity": "NaN", "v24hUSD": 1, "price": 1}})
+        )
         with self.assertRaises(ExternalServiceError):
             adapter.token_intel("solana", TOKEN_MINT)
 
@@ -88,8 +124,13 @@ class BirdeyeTest(unittest.TestCase):
 
     def test_empty_api_key_refused_at_construction(self):
         with self.assertRaises(DomainError):
-            BirdeyeAdapter(api_key="", transport=Recorder(lambda r: ok({})),
-                           caller=caller(FakeClock(START)), timeout=1, clock=FakeClock(START).now)
+            BirdeyeAdapter(
+                api_key="",
+                transport=Recorder(lambda r: ok({})),
+                caller=caller(FakeClock(START)),
+                timeout=1,
+                clock=FakeClock(START).now,
+            )
 
     def test_timeout_retried_and_surfaces(self):
         adapter, rec = self.make(lambda r: TransportTimeout())
@@ -104,8 +145,16 @@ class SolanaTrackerTest(unittest.TestCase):
         clock = FakeClock(START)
         self.clock = clock
         rec = Recorder(handler)
-        return SolanaTrackerAdapter(api_key="STKEY", transport=rec, caller=caller(clock), timeout=5,
-                                    clock=clock.now), rec
+        return (
+            SolanaTrackerAdapter(
+                api_key="STKEY",
+                transport=rec,
+                caller=caller(clock),
+                timeout=5,
+                clock=clock.now,
+            ),
+            rec,
+        )
 
     def test_holder_profile_and_top10_share(self):
         accounts = [{"wallet": f"w{i}", "amount": 10} for i in range(20)]
@@ -134,11 +183,15 @@ class SolanaTrackerTest(unittest.TestCase):
 
     def test_empty_accounts_gives_no_share(self):
         adapter, _ = self.make(lambda r: ok({"total": 0, "accounts": []}))
-        self.assertIsNone(adapter.holder_profile("solana", TOKEN_MINT).top_holder_share_pct)
+        self.assertIsNone(
+            adapter.holder_profile("solana", TOKEN_MINT).top_holder_share_pct
+        )
 
     def test_malformed_holder_account_entry_rejected(self):
         adapter, _ = self.make(
-            lambda r: ok({"total": 500, "accounts": [{"wallet": "w1", "amount": 10}, None]})
+            lambda r: ok(
+                {"total": 500, "accounts": [{"wallet": "w1", "amount": 10}, None]}
+            )
         )
         with self.assertRaises(ExternalServiceError):
             adapter.holder_profile("solana", TOKEN_MINT)
@@ -148,19 +201,33 @@ class JupiterTest(unittest.TestCase):
     def make(self, handler, slippage=50):
         clock = FakeClock(START)
         rec = Recorder(handler)
-        return JupiterQuoteAdapter(api_key="JUPKEY", transport=rec, caller=caller(clock), timeout=5,
-                                   clock=clock.now, slippage_bps=slippage), rec
+        return (
+            JupiterQuoteAdapter(
+                api_key="JUPKEY",
+                transport=rec,
+                caller=caller(clock),
+                timeout=5,
+                clock=clock.now,
+                slippage_bps=slippage,
+            ),
+            rec,
+        )
 
     def good(self, **over):
-        body = {"inputMint": SOL_MINT, "outputMint": TOKEN_MINT, "inAmount": "1000000",
-                "outAmount": "5000000", "priceImpactPct": "0.12"}
+        body = {
+            "inputMint": SOL_MINT,
+            "outputMint": TOKEN_MINT,
+            "inAmount": "1000000",
+            "outAmount": "5000000",
+            "priceImpactPct": "0.12",
+        }
         body.update(over)
         return body
 
     def test_quote_is_built_with_expiry_and_key_in_header_only(self):
         adapter, rec = self.make(lambda r: ok(self.good()))
         q = adapter.quote(SOL_MINT, TOKEN_MINT, Decimal(1000000))
-        self.assertEqual(q.out_amount, Decimal("5000000"))
+        self.assertEqual(q.out_amount, Decimal(5000000))
         self.assertEqual(q.expires_at - q.quoted_at, timedelta(seconds=20))
         req = rec.requests[0]
         self.assertIn("api.jup.ag/swap/v2/quote", req.url)
@@ -194,7 +261,10 @@ class JitoTest(unittest.TestCase):
     def make(self, handler):
         clock = FakeClock(START)
         rec = Recorder(handler)
-        return JitoClient(transport=rec, caller=caller(clock), timeout=5, clock=clock.now), rec
+        return (
+            JitoClient(transport=rec, caller=caller(clock), timeout=5, clock=clock.now),
+            rec,
+        )
 
     def tip_accounts_reply(self, r):
         return ok({"jsonrpc": "2.0", "id": 1, "result": [TIP_ACCOUNT] * 8})
@@ -222,20 +292,37 @@ class JitoTest(unittest.TestCase):
             return self.tip_accounts_reply(r)
 
         client, rec = self.make(handler)
-        plan = client.plan_bundle(transaction_count=2, expected_gain_lamports=Decimal(60000),
-                                  cap_lamports=50000, tip_account=TIP_ACCOUNT)
+        plan = client.plan_bundle(
+            transaction_count=2,
+            expected_gain_lamports=Decimal(60000),
+            cap_lamports=50000,
+            tip_account=TIP_ACCOUNT,
+        )
         self.assertEqual(plan.tip_lamports, Decimal(30000))
         self.assertEqual(plan.transaction_count, 2)
-        self.assertFalse(any("sendBundle" in (r.body or b"").decode(errors="ignore") for r in rec.requests))
+        self.assertFalse(
+            any(
+                "sendBundle" in (r.body or b"").decode(errors="ignore")
+                for r in rec.requests
+            )
+        )
 
     def test_bundle_size_and_tip_account_checked(self):
         client, _ = self.make(lambda r: ok([{"landed_tips_50th_percentile": 0}]))
         with self.assertRaises(DomainError):
-            client.plan_bundle(transaction_count=6, expected_gain_lamports=Decimal(1),
-                               cap_lamports=10, tip_account=TIP_ACCOUNT)
+            client.plan_bundle(
+                transaction_count=6,
+                expected_gain_lamports=Decimal(1),
+                cap_lamports=10,
+                tip_account=TIP_ACCOUNT,
+            )
         with self.assertRaises(DomainError):
-            client.plan_bundle(transaction_count=1, expected_gain_lamports=Decimal(1),
-                               cap_lamports=10, tip_account="not-base58!")
+            client.plan_bundle(
+                transaction_count=1,
+                expected_gain_lamports=Decimal(1),
+                cap_lamports=10,
+                tip_account="not-base58!",
+            )
 
     def test_malformed_tip_floor_rejected(self):
         client, _ = self.make(lambda r: ok([{"other": 1}]))
@@ -247,32 +334,87 @@ class HeliusTest(unittest.TestCase):
     def make(self, handler):
         clock = FakeClock(START)
         rec = Recorder(handler)
-        return HeliusRpc(api_key="HELIUSKEY", transport=rec, caller=caller(clock), timeout=5,
-                         clock=clock.now), rec
+        return (
+            HeliusRpc(
+                api_key="HELIUSKEY",
+                transport=rec,
+                caller=caller(clock),
+                timeout=5,
+                clock=clock.now,
+            ),
+            rec,
+        )
 
     def test_token_balance_sums_parsed_accounts(self):
-        reply = {"jsonrpc": "2.0", "id": 1, "result": {"value": [
-            {"account": {"data": {"parsed": {"info": {"tokenAmount": {"uiAmountString": "1.5"}}}}}},
-            {"account": {"data": {"parsed": {"info": {"tokenAmount": {"uiAmountString": "2"}}}}}},
-        ]}}
+        reply = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "value": [
+                    {
+                        "account": {
+                            "data": {
+                                "parsed": {
+                                    "info": {"tokenAmount": {"uiAmountString": "1.5"}}
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "account": {
+                            "data": {
+                                "parsed": {
+                                    "info": {"tokenAmount": {"uiAmountString": "2"}}
+                                }
+                            }
+                        }
+                    },
+                ]
+            },
+        }
         client, rec = self.make(lambda r: ok(reply))
         self.assertEqual(client.token_balance(OWNER, TOKEN_MINT), Decimal("3.5"))
         self.assertIn("api-key=HELIUSKEY", rec.requests[0].url)
 
     def test_signature_status_mapping(self):
-        for level, expected in (("processed", "PROCESSED"), ("confirmed", "CONFIRMED"),
-                                ("finalized", "FINALIZED")):
-            client, _ = self.make(lambda r, level=level: ok(
-                {"jsonrpc": "2.0", "id": 1, "result": {"value": [{"confirmationStatus": level, "err": None}]}}))
+        for level, expected in (
+            ("processed", "PROCESSED"),
+            ("confirmed", "CONFIRMED"),
+            ("finalized", "FINALIZED"),
+        ):
+            client, _ = self.make(
+                lambda r, level=level: ok(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "result": {
+                            "value": [{"confirmationStatus": level, "err": None}]
+                        },
+                    }
+                )
+            )
             self.assertEqual(client.signature_status("sig"), expected)
-        client, _ = self.make(lambda r: ok({"jsonrpc": "2.0", "id": 1, "result": {"value": [None]}}))
+        client, _ = self.make(
+            lambda r: ok({"jsonrpc": "2.0", "id": 1, "result": {"value": [None]}})
+        )
         self.assertEqual(client.signature_status("sig"), "NOT_FOUND")
-        client, _ = self.make(lambda r: ok({"jsonrpc": "2.0", "id": 1,
-                                            "result": {"value": [{"err": {"x": 1}, "confirmationStatus": "confirmed"}]}}))
+        client, _ = self.make(
+            lambda r: ok(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": {
+                        "value": [{"err": {"x": 1}, "confirmationStatus": "confirmed"}]
+                    },
+                }
+            )
+        )
         self.assertEqual(client.signature_status("sig"), "FAILED")
 
     def test_rpc_error_object_is_not_retried(self):
-        client, rec = self.make(lambda r: ok({"jsonrpc": "2.0", "id": 1, "error": {"code": -1}}))
+        client, rec = self.make(
+            lambda r: ok({"jsonrpc": "2.0", "id": 1, "error": {"code": -1}})
+        )
         with self.assertRaises(ExternalServiceError):
             client.token_balance(OWNER, TOKEN_MINT)
         self.assertEqual(len(rec.requests), 1)
@@ -294,12 +436,25 @@ class ProviderTest(unittest.TestCase):
     def build(self, name, handler, model=None):
         clock = FakeClock(START)
         rec = Recorder(handler)
-        provider = build_provider(name=name, api_key="PROVKEY", model=model, transport=rec,
-                                  caller=caller(clock), timeout=5)
+        provider = build_provider(
+            name=name,
+            api_key="PROVKEY",
+            model=model,
+            transport=rec,
+            caller=caller(clock),
+            timeout=5,
+        )
         return provider, rec
 
     def test_each_provider_uses_its_endpoint_and_header(self):
-        anthropic_reply = {"content": [{"type": "text", "text": '{"decision":"SKIP","confidence":0.1,"reason":"x"}'}]}
+        anthropic_reply = {
+            "content": [
+                {
+                    "type": "text",
+                    "text": '{"decision":"SKIP","confidence":0.1,"reason":"x"}',
+                }
+            ]
+        }
         p, rec = self.build("anthropic", lambda r: ok(anthropic_reply))
         self.assertIn("SKIP", p.complete("sys", "user"))
         self.assertEqual(rec.requests[0].url, "https://api.anthropic.com/v1/messages")
@@ -309,7 +464,9 @@ class ProviderTest(unittest.TestCase):
         openai_reply = {"choices": [{"message": {"content": "{}"}}]}
         p, rec = self.build("openai", lambda r: ok(openai_reply))
         p.complete("sys", "user")
-        self.assertEqual(rec.requests[0].url, "https://api.openai.com/v1/chat/completions")
+        self.assertEqual(
+            rec.requests[0].url, "https://api.openai.com/v1/chat/completions"
+        )
         self.assertEqual(rec.requests[0].headers["Authorization"], "Bearer PROVKEY")
 
         p, rec = self.build("grok", lambda r: ok(openai_reply))
@@ -317,7 +474,11 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(rec.requests[0].url, "https://api.x.ai/v1/chat/completions")
 
     def test_model_override_from_settings(self):
-        p, rec = self.build("openai", lambda r: ok({"choices": [{"message": {"content": "{}"}}]}), model="gpt-x")
+        p, rec = self.build(
+            "openai",
+            lambda r: ok({"choices": [{"message": {"content": "{}"}}]}),
+            model="gpt-x",
+        )
         p.complete("s", "u")
         self.assertEqual(json.loads(rec.requests[0].body)["model"], "gpt-x")
 
@@ -328,18 +489,41 @@ class ProviderTest(unittest.TestCase):
 
     def test_unknown_provider_and_missing_key(self):
         with self.assertRaises(ConfigurationError):
-            build_provider(name="bogus", api_key="k", model=None, transport=Recorder(lambda r: ok({})),
-                           caller=caller(FakeClock(START)), timeout=1)
+            build_provider(
+                name="bogus",
+                api_key="k",
+                model=None,
+                transport=Recorder(lambda r: ok({})),
+                caller=caller(FakeClock(START)),
+                timeout=1,
+            )
         with self.assertRaises(ConfigurationError):
-            build_provider(name="grok", api_key="", model=None, transport=Recorder(lambda r: ok({})),
-                           caller=caller(FakeClock(START)), timeout=1)
+            build_provider(
+                name="grok",
+                api_key="",
+                model=None,
+                transport=Recorder(lambda r: ok({})),
+                caller=caller(FakeClock(START)),
+                timeout=1,
+            )
 
     def test_brain_with_real_provider_shape_fails_closed_on_garbage(self):
-        p, _ = self.build("grok", lambda r: ok({"choices": [{"message": {"content": "maybe buy?"}}]}))
-        d = AIBrain(p, threshold=Decimal("0.6")).decide(TradeContext(
-            mint=TOKEN_MINT, symbol="X", liquidity_usd=Decimal(1), volume_24h_usd=Decimal(1),
-            top10_holder_share_pct=None, holder_count=None, heuristic_score=Decimal(1),
-            safety_risk_score=Decimal(1), rugged=False))
+        p, _ = self.build(
+            "grok", lambda r: ok({"choices": [{"message": {"content": "maybe buy?"}}]})
+        )
+        d = AIBrain(p, threshold=Decimal("0.6")).decide(
+            TradeContext(
+                mint=TOKEN_MINT,
+                symbol="X",
+                liquidity_usd=Decimal(1),
+                volume_24h_usd=Decimal(1),
+                top10_holder_share_pct=None,
+                holder_count=None,
+                heuristic_score=Decimal(1),
+                safety_risk_score=Decimal(1),
+                rugged=False,
+            )
+        )
         self.assertEqual(d.decision, "SKIP")
 
 
@@ -369,8 +553,13 @@ class ReconciliationTest(unittest.TestCase):
         self.latch = EmergencyLatch()
 
     def worker(self, balances):
-        return ReconciliationWorker(db=self.db, balances=balances, owner=OWNER,
-                                    tolerance_pct=Decimal("1"), latch=self.latch)
+        return ReconciliationWorker(
+            db=self.db,
+            balances=balances,
+            owner=OWNER,
+            tolerance_pct=Decimal(1),
+            latch=self.latch,
+        )
 
     def test_not_configured_does_nothing(self):
         r = self.worker(None).run_once(TOKEN_MINT, START)
@@ -395,16 +584,24 @@ class ReconciliationTest(unittest.TestCase):
 
     def test_tolerance_bounds_validated(self):
         with self.assertRaises(ValueError):
-            ReconciliationWorker(db=self.db, balances=None, owner=OWNER, tolerance_pct=Decimal(101),
-                                 latch=self.latch)
+            ReconciliationWorker(
+                db=self.db,
+                balances=None,
+                owner=OWNER,
+                tolerance_pct=Decimal(101),
+                latch=self.latch,
+            )
 
 
 class OutboxSanityTest(unittest.TestCase):
     def test_no_submit_methods_exist_on_adapters(self):
         for cls in (JitoClient, JupiterQuoteAdapter, HeliusRpc):
             names = {n for n in dir(cls) if not n.startswith("_")}
-            self.assertFalse(names & {"send_bundle", "sendBundle", "submit_bundle", "send_transaction"},
-                             cls.__name__)
+            self.assertFalse(
+                names
+                & {"send_bundle", "sendBundle", "submit_bundle", "send_transaction"},
+                cls.__name__,
+            )
 
 
 if __name__ == "__main__":

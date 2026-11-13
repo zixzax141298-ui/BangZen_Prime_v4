@@ -8,7 +8,9 @@ from collections import defaultdict
 
 class Metrics:
     def __init__(self) -> None:
-        self._counters: dict[tuple[str, tuple[tuple[str, str], ...]], float] = defaultdict(float)
+        self._counters: dict[tuple[str, tuple[tuple[str, str], ...]], float] = (
+            defaultdict(float)
+        )
         self._gauges: dict[tuple[str, tuple[tuple[str, str], ...]], float] = {}
         self._lock = threading.Lock()
 
@@ -42,7 +44,9 @@ class Metrics:
                     for (metric, labels), v in sorted(store.items()):
                         if metric != name:
                             continue
-                        label_text = ",".join(f'{k}="{_escape(val)}"' for k, val in labels)
+                        label_text = ",".join(
+                            f'{k}="{_escape(val)}"' for k, val in labels
+                        )
                         suffix = f"{{{label_text}}}" if label_text else ""
                         lines.append(f"{name}{suffix} {v:g}")
         return "\n".join(lines) + "\n"

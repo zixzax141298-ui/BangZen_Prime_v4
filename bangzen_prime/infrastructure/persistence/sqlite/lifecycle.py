@@ -21,7 +21,9 @@ class LifecycleStore:
 
     @staticmethod
     def _encode_evidence(evidence: dict[str, Any]) -> str:
-        encoded = json.dumps(evidence, sort_keys=True, separators=(",", ":"), default=str)
+        encoded = json.dumps(
+            evidence, sort_keys=True, separators=(",", ":"), default=str
+        )
         if len(encoded.encode("utf-8")) > 16_384:
             raise ValueError("lifecycle evidence exceeds 16 KiB")
         return encoded
@@ -36,7 +38,9 @@ class LifecycleStore:
                 "WHERE chain = ? AND mint = ?",
                 (observation.chain, observation.mint),
             ).fetchone()
-            if row is not None and observation.observed_at <= parse_iso(row["last_observed_at"]):
+            if row is not None and observation.observed_at <= parse_iso(
+                row["last_observed_at"]
+            ):
                 return False
 
             previous = row["phase"] if row is not None else None
@@ -46,8 +50,14 @@ class LifecycleStore:
                     "(chain, mint, phase, first_seen_at, last_seen_at, last_observed_at, "
                     "reason, evidence_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (
-                        observation.chain, observation.mint, observation.phase.value,
-                        observed_at, observed_at, observed_at, observation.reason, evidence_json,
+                        observation.chain,
+                        observation.mint,
+                        observation.phase.value,
+                        observed_at,
+                        observed_at,
+                        observed_at,
+                        observation.reason,
+                        evidence_json,
                     ),
                 )
             else:
@@ -56,8 +66,13 @@ class LifecycleStore:
                     "last_observed_at = ?, reason = ?, evidence_json = ? "
                     "WHERE chain = ? AND mint = ?",
                     (
-                        observation.phase.value, observed_at, observed_at,
-                        observation.reason, evidence_json, observation.chain, observation.mint,
+                        observation.phase.value,
+                        observed_at,
+                        observed_at,
+                        observation.reason,
+                        evidence_json,
+                        observation.chain,
+                        observation.mint,
                     ),
                 )
 
@@ -67,8 +82,13 @@ class LifecycleStore:
                     "(chain, mint, from_phase, to_phase, observed_at, reason, evidence_json) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (
-                        observation.chain, observation.mint, previous,
-                        observation.phase.value, observed_at, observation.reason, evidence_json,
+                        observation.chain,
+                        observation.mint,
+                        previous,
+                        observation.phase.value,
+                        observed_at,
+                        observation.reason,
+                        evidence_json,
                     ),
                 )
             return True
@@ -80,7 +100,9 @@ class LifecycleStore:
         )
         return dict(row) if row is not None else None
 
-    def history(self, chain: str, mint: str, *, limit: int = 100) -> list[dict[str, Any]]:
+    def history(
+        self, chain: str, mint: str, *, limit: int = 100
+    ) -> list[dict[str, Any]]:
         if not 1 <= limit <= 1000:
             raise ValueError("history limit must be within [1, 1000]")
         rows = self._db.query_all(

@@ -6,13 +6,11 @@ import unittest
 
 from bangzen_prime.infrastructure.chain.helius_websocket import (
     HeliusLogEvent,
-    HeliusStreamGap,
     HeliusStreamProtocolError,
     HeliusWebSocketConfig,
     build_logs_subscribe_request,
     parse_logs_notification,
 )
-
 
 ADDRESS = "11111111111111111111111111111111"
 
@@ -31,20 +29,22 @@ class HeliusWebSocketParserTests(unittest.TestCase):
             build_logs_subscribe_request(ADDRESS, "optimistic")
 
     def test_parses_valid_notification_without_inventing_fields(self):
-        event = parse_logs_notification({
-            "jsonrpc": "2.0",
-            "method": "logsNotification",
-            "params": {
-                "result": {
-                    "context": {"slot": 123},
-                    "value": {
-                        "signature": "sig-123",
-                        "err": None,
-                        "logs": ["Program log: instruction"],
-                    },
-                }
-            },
-        })
+        event = parse_logs_notification(
+            {
+                "jsonrpc": "2.0",
+                "method": "logsNotification",
+                "params": {
+                    "result": {
+                        "context": {"slot": 123},
+                        "value": {
+                            "signature": "sig-123",
+                            "err": None,
+                            "logs": ["Program log: instruction"],
+                        },
+                    }
+                },
+            }
+        )
         self.assertEqual(
             event,
             HeliusLogEvent(
@@ -56,34 +56,55 @@ class HeliusWebSocketParserTests(unittest.TestCase):
         )
 
     def test_failed_transaction_is_preserved_as_failure_evidence(self):
-        event = parse_logs_notification({
-            "method": "logsNotification",
-            "params": {
-                "result": {
-                    "context": {"slot": 1},
-                    "value": {"signature": "sig", "err": {"InstructionError": [0, "x"]}, "logs": []},
-                }
-            },
-        })
+        event = parse_logs_notification(
+            {
+                "method": "logsNotification",
+                "params": {
+                    "result": {
+                        "context": {"slot": 1},
+                        "value": {
+                            "signature": "sig",
+                            "err": {"InstructionError": [0, "x"]},
+                            "logs": [],
+                        },
+                    }
+                },
+            }
+        )
         self.assertTrue(event.transaction_failed)
 
     def test_unrelated_json_rpc_message_is_ignored(self):
-        self.assertIsNone(parse_logs_notification({"jsonrpc": "2.0", "result": 7, "id": 1}))
+        self.assertIsNone(
+            parse_logs_notification({"jsonrpc": "2.0", "result": 7, "id": 1})
+        )
 
     def test_malformed_notification_fails_closed(self):
         bad_payloads = [
             {"method": "logsNotification", "params": {}},
-            {"method": "logsNotification", "params": {"result": {
-                "context": {"slot": True},
-                "value": {"signature": "sig", "logs": []},
-            }}},
-            {"method": "logsNotification", "params": {"result": {
-                "context": {"slot": 1},
-                "value": {"signature": "sig", "logs": "not-a-list"},
-            }}},
+            {
+                "method": "logsNotification",
+                "params": {
+                    "result": {
+                        "context": {"slot": True},
+                        "value": {"signature": "sig", "logs": []},
+                    }
+                },
+            },
+            {
+                "method": "logsNotification",
+                "params": {
+                    "result": {
+                        "context": {"slot": 1},
+                        "value": {"signature": "sig", "logs": "not-a-list"},
+                    }
+                },
+            },
         ]
         for payload in bad_payloads:
-            with self.subTest(payload=payload), self.assertRaises(HeliusStreamProtocolError):
+            with (
+                self.subTest(payload=payload),
+                self.assertRaises(HeliusStreamProtocolError),
+            ):
                 parse_logs_notification(payload)
 
 

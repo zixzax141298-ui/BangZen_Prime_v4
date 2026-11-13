@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 
-
 from bangzen_prime.domain.shared import DomainEvent
 from bangzen_prime.domain.tokens import Token
 from bangzen_prime.errors import PersistenceError
@@ -24,9 +23,13 @@ def seeded_file_db(path, audit_entries=3):
         log = AuditLog(conn)
         for i in range(audit_entries):
             log.append("E", {"i": i}, START + timedelta(seconds=i))
-        OutboxStore(conn).enqueue(DomainEvent("E", {}, START, event_id="old-sent"), START)
-        conn.execute("UPDATE outbox SET status='SENT', sent_at=? WHERE id='old-sent'",
-                     ("2025-01-01T00:00:00+00:00",))
+        OutboxStore(conn).enqueue(
+            DomainEvent("E", {}, START, event_id="old-sent"), START
+        )
+        conn.execute(
+            "UPDATE outbox SET status='SENT', sent_at=? WHERE id='old-sent'",
+            ("2025-01-01T00:00:00+00:00",),
+        )
     return db
 
 
@@ -56,7 +59,9 @@ class DatabaseFailureTest(unittest.TestCase):
         uow = UnitOfWork(db)
         with self.assertRaises(KeyboardInterrupt):
             with uow.begin() as repos:
-                repos.tokens.upsert(Token(chain="solana", mint=TOKEN_MINT, symbol="T"), START)
+                repos.tokens.upsert(
+                    Token(chain="solana", mint=TOKEN_MINT, symbol="T"), START
+                )
                 raise KeyboardInterrupt()
         self.assertIsNone(db.query_one("SELECT 1 FROM tokens"))
 
@@ -65,9 +70,11 @@ class DatabaseFailureTest(unittest.TestCase):
         db.migrate()
         with self.assertRaises(sqlite3.IntegrityError):
             with db.transaction() as conn:
-                conn.execute("INSERT INTO pairs (id, token_id, chain, pair_address, dex_id, price_usd,"
-                             " liquidity_usd, volume_24h_usd, observed_at) VALUES"
-                             " ('p','missing','solana','a','d','1','1','1','x')")
+                conn.execute(
+                    "INSERT INTO pairs (id, token_id, chain, pair_address, dex_id, price_usd,"
+                    " liquidity_usd, volume_24h_usd, observed_at) VALUES"
+                    " ('p','missing','solana','a','d','1','1','1','x')"
+                )
 
 
 class BackupRestoreTest(unittest.TestCase):
@@ -81,7 +88,9 @@ class BackupRestoreTest(unittest.TestCase):
             restored = Database(target)
             with restored.transaction() as conn:
                 self.assertIsNone(AuditLog(conn).verify())
-            self.assertEqual(restored.query_one("SELECT COUNT(*) AS n FROM audit_log")["n"], 3)
+            self.assertEqual(
+                restored.query_one("SELECT COUNT(*) AS n FROM audit_log")["n"], 3
+            )
             restored.close()
             src.close()
 
@@ -126,7 +135,9 @@ class BackupRestoreTest(unittest.TestCase):
 class RetentionTest(unittest.TestCase):
     def test_prune_removes_old_delivered_rows_but_never_audit(self):
         db = seeded_file_db(":memory:", audit_entries=4)
-        result = maintenance.prune(db, now=START + timedelta(days=400), retain=timedelta(days=30))
+        result = maintenance.prune(
+            db, now=START + timedelta(days=400), retain=timedelta(days=30)
+        )
         self.assertEqual(result["outbox_sent_deleted"], 1)
         self.assertEqual(db.query_one("SELECT COUNT(*) AS n FROM audit_log")["n"], 4)
         with db.transaction() as conn:
@@ -135,7 +146,9 @@ class RetentionTest(unittest.TestCase):
     def test_recent_rows_kept(self):
         db = seeded_file_db(":memory:")
         # seeded row is dated 2025-01-01; 15 Jan 2025 is inside the 30-day window
-        result = maintenance.prune(db, now=datetime(2025, 1, 15, tzinfo=UTC), retain=timedelta(days=30))
+        result = maintenance.prune(
+            db, now=datetime(2025, 1, 15, tzinfo=UTC), retain=timedelta(days=30)
+        )
         self.assertEqual(result["outbox_sent_deleted"], 0)
 
 

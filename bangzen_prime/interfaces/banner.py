@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 # Optional heavy deps — graceful degrade if missing
@@ -13,13 +13,13 @@ except ImportError:  # pragma: no cover
     pyfiglet = None  # type: ignore
 
 try:
+    from rich import box
     from rich.align import Align
     from rich.console import Console, Group
     from rich.panel import Panel
     from rich.rule import Rule
     from rich.table import Table
     from rich.text import Text
-    from rich import box
 except ImportError:  # pragma: no cover
     Console = None  # type: ignore
 
@@ -81,9 +81,13 @@ def render_banner(
     meta.add_row("PAPER", "ENABLED" if paper else "OFF")
     meta.add_row(
         "LIVE CHAIN",
-        Text("LOCKED", style=f"bold {EMERALD}") if live_locked else Text("UNLOCKED", style=f"bold {CRIMSON}"),
+        (
+            Text("LOCKED", style=f"bold {EMERALD}")
+            if live_locked
+            else Text("UNLOCKED", style=f"bold {CRIMSON}")
+        ),
     )
-    meta.add_row("UTC", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
+    meta.add_row("UTC", datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"))
     if subtitle:
         meta.add_row("NOTE", subtitle)
 
@@ -137,7 +141,7 @@ def render_compact_header(
     right.add_row(Text("Autonomous Solana Intelligence", style=MUTED))
     right.add_row(Text(f"v{version}  ·  {mode}  ·  LIVE LOCKED", style=CYAN))
     right.add_row(
-        Text(datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"), style=MUTED)
+        Text(datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"), style=MUTED)
     )
 
     grid = Table.grid(expand=True, padding=(0, 2))

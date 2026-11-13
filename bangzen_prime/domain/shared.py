@@ -16,7 +16,11 @@ def utc_now() -> datetime:
 
 def ensure_utc(value: datetime) -> datetime:
     """Reject naive datetimes; normalise aware ones to UTC."""
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+    if (
+        not isinstance(value, datetime)
+        or value.tzinfo is None
+        or value.utcoffset() is None
+    ):
         raise DomainError("timestamp must be timezone-aware")
     return value.astimezone(UTC)
 
@@ -64,7 +68,9 @@ class AggregateRoot(Entity):
         super().__init__(entity_id)
         self._events: list[DomainEvent] = []
 
-    def record_event(self, name: str, payload: dict[str, Any], occurred_at: datetime) -> DomainEvent:
+    def record_event(
+        self, name: str, payload: dict[str, Any], occurred_at: datetime
+    ) -> DomainEvent:
         event = DomainEvent(name=name, payload=dict(payload), occurred_at=occurred_at)
         self._events.append(event)
         return event

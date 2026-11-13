@@ -3,18 +3,45 @@ from datetime import timedelta
 from decimal import Decimal
 
 from bangzen_prime.application.ai_brain import AIDecision
-from bangzen_prime.application.controlled_execution import ChainPolicy, ControlledExecution, SafetyApproval
+from bangzen_prime.application.controlled_execution import (
+    ChainPolicy,
+    ControlledExecution,
+    SafetyApproval,
+)
 from bangzen_prime.domain.execution import balance_delta_matches
 from bangzen_prime.errors import DomainError
 from bangzen_prime.infrastructure.persistence.sqlite.database import Database
 from bangzen_prime.infrastructure.persistence.sqlite.repositories import UnitOfWork
 from tests.support import START, clock_at
-from tests.support_chain import MINTS, OWNER, PROGRAM, VAULT, FakeBuilder, FakeQuotes, FakeRpc, FakeSigner
+from tests.support_chain import (
+    MINTS,
+    OWNER,
+    PROGRAM,
+    VAULT,
+    FakeBuilder,
+    FakeQuotes,
+    FakeRpc,
+    FakeSigner,
+)
 
 D = Decimal
 
 
-def make(quotes=None, builder=None, rpc=None, signer=None, clock=None, allow=False, ai_approved=True, ai_source="model", ai_confidence=D("0.9"), ai_gate_configured=True, risk_gate_configured=True, risk_approved=True, db=None):
+def make(
+    quotes=None,
+    builder=None,
+    rpc=None,
+    signer=None,
+    clock=None,
+    allow=False,
+    ai_approved=True,
+    ai_source="model",
+    ai_confidence=D("0.9"),
+    ai_gate_configured=True,
+    risk_gate_configured=True,
+    risk_approved=True,
+    db=None,
+):
     db = db or Database(":memory:")
     db.migrate()
     clock = clock or clock_at(0)
@@ -22,24 +49,55 @@ def make(quotes=None, builder=None, rpc=None, signer=None, clock=None, allow=Fal
     builder = builder or FakeBuilder()
     builder.now = clock.now()
     quotes.now = clock.now()
-    policy = ChainPolicy(owner=OWNER, allowed_programs=frozenset({PROGRAM}),
-                         allowed_destinations=frozenset({VAULT}), max_price_impact_pct=D("1"))
-    ce = ControlledExecution(uow=UnitOfWork(db), quotes=quotes, builder=builder,
-                             rpc=rpc or FakeRpc(), signer=signer or FakeSigner(), policy=policy,
-                             clock=clock.now, broadcast_allowed=allow,
-                             pretrade_gate=((lambda _i, _o, _a: AIDecision(
-                                 "BUY" if ai_approved else "SKIP", ai_confidence,
-                                 "TEST_APPROVED", ai_source))
-                                            if allow and ai_gate_configured else None),
-                             risk_gate=((lambda _i, _o, _a: SafetyApproval(
-                                 risk_approved, "RISK_APPROVED" if risk_approved else "TEST_RISK_VETO"))
-                                        if allow and risk_gate_configured else None))
+    policy = ChainPolicy(
+        owner=OWNER,
+        allowed_programs=frozenset({PROGRAM}),
+        allowed_destinations=frozenset({VAULT}),
+        max_price_impact_pct=D("1"),
+    )
+    ce = ControlledExecution(
+        uow=UnitOfWork(db),
+        quotes=quotes,
+        builder=builder,
+        rpc=rpc or FakeRpc(),
+        signer=signer or FakeSigner(),
+        policy=policy,
+        clock=clock.now,
+        broadcast_allowed=allow,
+        pretrade_gate=(
+            (
+                lambda _i, _o, _a: AIDecision(
+                    "BUY" if ai_approved else "SKIP",
+                    ai_confidence,
+                    "TEST_APPROVED",
+                    ai_source,
+                )
+            )
+            if allow and ai_gate_configured
+            else None
+        ),
+        risk_gate=(
+            (
+                lambda _i, _o, _a: SafetyApproval(
+                    risk_approved,
+                    "RISK_APPROVED" if risk_approved else "TEST_RISK_VETO",
+                )
+            )
+            if allow and risk_gate_configured
+            else None
+        ),
+    )
     return ce, db, clock
 
 
 def run(ce, key="k1", mode="VALIDATE_ONLY", amount="1"):
-    return ce.run(idempotency_key=key, input_mint=MINTS["input_mint"],
-                  output_mint=MINTS["output_mint"], in_amount=D(amount), mode=mode)
+    return ce.run(
+        idempotency_key=key,
+        input_mint=MINTS["input_mint"],
+        output_mint=MINTS["output_mint"],
+        in_amount=D(amount),
+        mode=mode,
+    )
 
 
 class StagePlanTest(unittest.TestCase):
@@ -78,7 +136,9 @@ class QuoteValidationTest(unittest.TestCase):
         q = FakeQuotes(ttl=30)
         clock = clock_at(0)
         ce, _, _ = make(quotes=q, clock=clock)
-        q.now = START - timedelta(seconds=60)  # quote issued in the past, already expired
+        q.now = START - timedelta(
+            seconds=60
+        )  # quote issued in the past, already expired
         self.assertIn("QUOTE_STALE", run(ce).reason)
 
     def test_price_impact_boundary(self):
@@ -102,15 +162,21 @@ class QuoteValidationTest(unittest.TestCase):
 
 class PlanInspectionTest(unittest.TestCase):
     def test_unknown_program_rejected(self):
-        ce, _, _ = make(builder=FakeBuilder(programs=("EvilProgram1111111111111111111111111111",)))
+        ce, _, _ = make(
+            builder=FakeBuilder(programs=("EvilProgram1111111111111111111111111111",))
+        )
         self.assertIn("UNKNOWN_PROGRAM", run(ce).reason)
 
     def test_unknown_destination_rejected(self):
-        ce, _, _ = make(builder=FakeBuilder(destination="Attacker11111111111111111111111111111111"))
+        ce, _, _ = make(
+            builder=FakeBuilder(destination="Attacker11111111111111111111111111111111")
+        )
         self.assertIn("UNKNOWN_DESTINATION", run(ce).reason)
 
     def test_foreign_source_rejected(self):
-        ce, _, _ = make(builder=FakeBuilder(source="OtherWallet111111111111111111111111111111"))
+        ce, _, _ = make(
+            builder=FakeBuilder(source="OtherWallet111111111111111111111111111111")
+        )
         self.assertIn("FOREIGN_SOURCE", run(ce).reason)
 
     def test_transfer_total_must_equal_quote_input(self):
@@ -118,7 +184,9 @@ class PlanInspectionTest(unittest.TestCase):
         self.assertIn("TRANSFER_TOTAL_MISMATCH", run(ce).reason)
 
     def test_fee_payer_must_be_owner(self):
-        ce, _, _ = make(builder=FakeBuilder(fee_payer="Someone11111111111111111111111111111111"))
+        ce, _, _ = make(
+            builder=FakeBuilder(fee_payer="Someone11111111111111111111111111111111")
+        )
         self.assertIn("FEE_PAYER_NOT_OWNER", run(ce).reason)
 
 
@@ -144,7 +212,9 @@ class IdempotencyAndRestartTest(unittest.TestCase):
         second = run(ce, key="same", mode="BROADCAST", amount="999")
         self.assertEqual(first.id, second.id)
         self.assertEqual(second.state, "SIMULATED")
-        self.assertEqual(db.query_one("SELECT COUNT(*) AS n FROM chain_attempts")["n"], 1)
+        self.assertEqual(
+            db.query_one("SELECT COUNT(*) AS n FROM chain_attempts")["n"], 1
+        )
 
     def test_attempt_survives_new_controller_instance(self):
         ce, db, clock = make()
@@ -191,7 +261,9 @@ class BroadcastPathTest(unittest.TestCase):
         ce, _, _ = make(rpc=rpc, allow=True)
         first = run(ce, mode="BROADCAST")
         second = run(ce, mode="BROADCAST")
-        self.assertEqual((first.state, first.reason), ("UNKNOWN", "SEND_OUTCOME_UNKNOWN"))
+        self.assertEqual(
+            (first.state, first.reason), ("UNKNOWN", "SEND_OUTCOME_UNKNOWN")
+        )
         self.assertEqual(second.id, first.id)
         self.assertEqual(rpc.sent, [])
 
@@ -202,7 +274,8 @@ class BroadcastPathTest(unittest.TestCase):
         class InspectingRpc(FakeRpc):
             def send(self, signed):
                 row = db.query_one(
-                    "SELECT state FROM chain_attempts WHERE idempotency_key = ?", ("k1",)
+                    "SELECT state FROM chain_attempts WHERE idempotency_key = ?",
+                    ("k1",),
                 )
                 self.assert_state = row["state"] if row else None
                 return super().send(signed)
@@ -219,13 +292,18 @@ class BroadcastPathTest(unittest.TestCase):
         clock = clock_at(0)
         ce, _, _ = make(rpc=rpc, allow=True, clock=clock)
         a = run(ce, mode="BROADCAST")
-        self.assertEqual(a.state, "UNKNOWN")       # not found yet, plan still valid: no resubmit
+        self.assertEqual(
+            a.state, "UNKNOWN"
+        )  # not found yet, plan still valid: no resubmit
         self.assertEqual(ce.reconcile(a.id).state, "UNKNOWN")
         clock.advance(121)
         self.assertEqual(ce.reconcile(a.id).state, "DROPPED")
 
     def test_signer_disabled_blocks_broadcast_even_when_allowed(self):
-        from bangzen_prime.infrastructure.adapters.execution.signing import DisabledSigner
+        from bangzen_prime.infrastructure.adapters.execution.signing import (
+            DisabledSigner,
+        )
+
         ce, _, _ = make(allow=True, signer=DisabledSigner())
         a = run(ce, mode="BROADCAST")
         self.assertEqual((a.state, a.reason), ("REJECTED", "SIGNER_DISABLED"))
@@ -234,18 +312,21 @@ class BroadcastPathTest(unittest.TestCase):
         rpc, signer = FakeRpc(), FakeSigner()
         ce, _, _ = make(rpc=rpc, signer=signer, allow=True, risk_gate_configured=False)
         attempt = run(ce, mode="BROADCAST")
-        self.assertEqual((attempt.state, attempt.reason),
-                         ("REJECTED", "RISK_APPROVAL_UNAVAILABLE"))
+        self.assertEqual(
+            (attempt.state, attempt.reason), ("REJECTED", "RISK_APPROVAL_UNAVAILABLE")
+        )
         self.assertEqual(signer.calls, 0)
         self.assertEqual(rpc.sent, [])
 
     def test_risk_veto_blocks_even_when_ai_approves(self):
         rpc, signer = FakeRpc(), FakeSigner()
-        ce, _, _ = make(rpc=rpc, signer=signer, allow=True,
-                        ai_approved=True, risk_approved=False)
+        ce, _, _ = make(
+            rpc=rpc, signer=signer, allow=True, ai_approved=True, risk_approved=False
+        )
         attempt = run(ce, mode="BROADCAST")
-        self.assertEqual((attempt.state, attempt.reason),
-                         ("REJECTED", "RISK_APPROVAL_DENIED"))
+        self.assertEqual(
+            (attempt.state, attempt.reason), ("REJECTED", "RISK_APPROVAL_DENIED")
+        )
         self.assertEqual(signer.calls, 0)
         self.assertEqual(rpc.sent, [])
 
@@ -262,7 +343,9 @@ class BroadcastPathTest(unittest.TestCase):
         rpc, signer = FakeRpc(), FakeSigner()
         quotes = FakeQuotes()
         ce, _, _ = make(rpc=rpc, signer=signer, quotes=quotes, allow=True)
-        ce._risk_gate = lambda _i, _o, _a: (_ for _ in ()).throw(RuntimeError("risk source down"))
+        ce._risk_gate = lambda _i, _o, _a: (_ for _ in ()).throw(
+            RuntimeError("risk source down")
+        )
         attempt = run(ce, mode="BROADCAST")
         self.assertEqual(attempt.reason, "RISK_APPROVAL_DENIED")
         self.assertEqual(signer.calls, 0)
@@ -272,16 +355,18 @@ class BroadcastPathTest(unittest.TestCase):
         rpc, signer = FakeRpc(), FakeSigner()
         ce, _, _ = make(rpc=rpc, signer=signer, allow=True, ai_gate_configured=False)
         attempt = run(ce, mode="BROADCAST")
-        self.assertEqual((attempt.state, attempt.reason),
-                         ("REJECTED", "AI_APPROVAL_UNAVAILABLE"))
+        self.assertEqual(
+            (attempt.state, attempt.reason), ("REJECTED", "AI_APPROVAL_UNAVAILABLE")
+        )
         self.assertEqual(signer.calls, 0)
         self.assertEqual(rpc.sent, [])
 
     def test_ai_veto_blocks_before_quote_and_signing(self):
         rpc, signer = FakeRpc(), FakeSigner()
         quotes = FakeQuotes()
-        ce, _, _ = make(quotes=quotes, rpc=rpc, signer=signer, allow=True,
-                        ai_approved=False)
+        ce, _, _ = make(
+            quotes=quotes, rpc=rpc, signer=signer, allow=True, ai_approved=False
+        )
         attempt = run(ce, mode="BROADCAST")
         self.assertEqual(attempt.reason, "AI_APPROVAL_DENIED")
         self.assertEqual(signer.calls, 0)
@@ -297,8 +382,7 @@ class BroadcastPathTest(unittest.TestCase):
 
     def test_low_confidence_ai_buy_cannot_approve_broadcast(self):
         rpc, signer = FakeRpc(), FakeSigner()
-        ce, _, _ = make(rpc=rpc, signer=signer, allow=True,
-                        ai_confidence=D("0.59"))
+        ce, _, _ = make(rpc=rpc, signer=signer, allow=True, ai_confidence=D("0.59"))
         attempt = run(ce, mode="BROADCAST")
         self.assertEqual(attempt.reason, "AI_APPROVAL_DENIED")
         self.assertEqual(signer.calls, 0)
@@ -307,16 +391,30 @@ class BroadcastPathTest(unittest.TestCase):
 
 class BalanceReconciliationTest(unittest.TestCase):
     def test_within_tolerance(self):
-        self.assertTrue(balance_delta_matches(before=D(0), after=D("50.4"), expected_increase=D(50),
-                                              tolerance_pct=D("1")))
+        self.assertTrue(
+            balance_delta_matches(
+                before=D(0),
+                after=D("50.4"),
+                expected_increase=D(50),
+                tolerance_pct=D("1"),
+            )
+        )
 
     def test_outside_tolerance(self):
-        self.assertFalse(balance_delta_matches(before=D(0), after=D("40"), expected_increase=D(50),
-                                               tolerance_pct=D("1")))
+        self.assertFalse(
+            balance_delta_matches(
+                before=D(0),
+                after=D("40"),
+                expected_increase=D(50),
+                tolerance_pct=D("1"),
+            )
+        )
 
     def test_non_positive_expectation_rejected(self):
         with self.assertRaises(DomainError):
-            balance_delta_matches(before=D(0), after=D(1), expected_increase=D(0), tolerance_pct=D(1))
+            balance_delta_matches(
+                before=D(0), after=D(1), expected_increase=D(0), tolerance_pct=D(1)
+            )
 
 
 if __name__ == "__main__":

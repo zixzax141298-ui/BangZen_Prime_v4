@@ -5,6 +5,7 @@ This parser validates TLV framing and identifies known mint extensions; it does
 not deserialize extension authorities/configuration or declare a token safe.
 Unknown IDs remain PARTIAL so catalog drift cannot silently become a clean audit.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -114,7 +115,10 @@ def parse_token_2022_tlv(tlv_data: bytes) -> ParsedToken2022Extensions:
             break
         if len(remaining) < 4:
             return ParsedToken2022Extensions(
-                REJECTED, tuple(records), _unique_flags(records), tuple(unknown),
+                REJECTED,
+                tuple(records),
+                _unique_flags(records),
+                tuple(unknown),
                 ("TRUNCATED_TLV_HEADER",),
             )
 
@@ -128,25 +132,37 @@ def parse_token_2022_tlv(tlv_data: bytes) -> ParsedToken2022Extensions:
                     )
                 break
             return ParsedToken2022Extensions(
-                REJECTED, tuple(records), _unique_flags(records), tuple(unknown),
+                REJECTED,
+                tuple(records),
+                _unique_flags(records),
+                tuple(unknown),
                 ("INVALID_UNINITIALIZED_EXTENSION_ENTRY",),
             )
 
         if type_id in seen:
             return ParsedToken2022Extensions(
-                REJECTED, tuple(records), _unique_flags(records), tuple(unknown),
+                REJECTED,
+                tuple(records),
+                _unique_flags(records),
+                tuple(unknown),
                 ("DUPLICATE_EXTENSION_TYPE",),
             )
         if type_id in ACCOUNT_ONLY_EXTENSION_IDS:
             return ParsedToken2022Extensions(
-                REJECTED, tuple(records), _unique_flags(records), tuple(unknown),
+                REJECTED,
+                tuple(records),
+                _unique_flags(records),
+                tuple(unknown),
                 ("ACCOUNT_EXTENSION_FOUND_IN_MINT",),
             )
 
         end = 4 + value_length
         if end > len(remaining):
             return ParsedToken2022Extensions(
-                REJECTED, tuple(records), _unique_flags(records), tuple(unknown),
+                REJECTED,
+                tuple(records),
+                _unique_flags(records),
+                tuple(unknown),
                 ("TLV_VALUE_EXCEEDS_ACCOUNT_DATA",),
             )
 
@@ -170,4 +186,6 @@ def parse_token_2022_tlv(tlv_data: bytes) -> ParsedToken2022Extensions:
 
 
 def _unique_flags(records: list[Token2022ExtensionRecord]) -> tuple[str, ...]:
-    return tuple(dict.fromkeys(flag for record in records for flag in record.risk_flags))
+    return tuple(
+        dict.fromkeys(flag for record in records for flag in record.risk_flags)
+    )

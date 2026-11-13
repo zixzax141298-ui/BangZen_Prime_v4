@@ -23,13 +23,19 @@ def check(path: str) -> list[str]:
             for alias in node.names:
                 imported[alias.asname or alias.name] = node.lineno
     used = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
-    used |= {n.value.id for n in ast.walk(tree) if isinstance(n, ast.Attribute)
-             and isinstance(n.value, ast.Name)}
+    used |= {
+        n.value.id
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
+    }
     exported = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "__all__"
-                                                for t in node.targets):
-            exported |= {elt.value for elt in node.value.elts if isinstance(elt, ast.Constant)}
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets
+        ):
+            exported |= {
+                elt.value for elt in node.value.elts if isinstance(elt, ast.Constant)
+            }
     issues = []
     for name, line in imported.items():
         if name not in used and name not in exported and not source.count(name) > 1:

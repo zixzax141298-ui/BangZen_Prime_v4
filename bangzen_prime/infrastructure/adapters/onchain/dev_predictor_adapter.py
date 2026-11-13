@@ -1,14 +1,17 @@
 import logging
 from dataclasses import dataclass
+
 import httpx
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class DevPredictorReport:
     is_serial_rugger: bool
     reason: str
     new_mint_timestamp: int | None = None
+
 
 class DevPredictorAdapter:
     def __init__(self, transport: httpx.AsyncClient, helius_api_key: str):

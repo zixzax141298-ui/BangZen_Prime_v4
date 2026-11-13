@@ -5,7 +5,11 @@ from __future__ import annotations
 import unittest
 from decimal import Decimal
 
-from bangzen_prime.application.data_validation import is_fresh, price_deviation_pct, prices_agree
+from bangzen_prime.application.data_validation import (
+    is_fresh,
+    price_deviation_pct,
+    prices_agree,
+)
 from bangzen_prime.errors import ConfigurationError
 from bangzen_prime.infrastructure.api_budget import BudgetRegistry, ProviderBudget
 
@@ -22,13 +26,16 @@ class BudgetTests(unittest.TestCase):
     def test_calls_beyond_the_window_limit_are_denied(self):
         clock = Clock()
         reg = BudgetRegistry([ProviderBudget("solana_tracker", 3)], clock)
-        self.assertEqual([reg.try_acquire("solana_tracker") for _ in range(5)],
-                         [True, True, True, False, False])
+        self.assertEqual(
+            [reg.try_acquire("solana_tracker") for _ in range(5)],
+            [True, True, True, False, False],
+        )
 
     def test_budget_refills_after_one_minute(self):
         clock = Clock()
         reg = BudgetRegistry([ProviderBudget("helius", 2)], clock)
-        reg.try_acquire("helius"); reg.try_acquire("helius")
+        reg.try_acquire("helius")
+        reg.try_acquire("helius")
         self.assertFalse(reg.try_acquire("helius"))
         clock.t = 59.9
         self.assertFalse(reg.try_acquire("helius"))
@@ -57,31 +64,37 @@ class BudgetTests(unittest.TestCase):
 
 class ValidationTests(unittest.TestCase):
     def test_deviation_is_exact_decimal(self):
-        self.assertEqual(price_deviation_pct(Decimal("1.00"), Decimal("1.10")), Decimal("10"))
+        self.assertEqual(
+            price_deviation_pct(Decimal("1.00"), Decimal("1.10")), Decimal(10)
+        )
 
     def test_boundary_is_inclusive_and_exact(self):
-        self.assertTrue(prices_agree(Decimal("1.00"), Decimal("1.10"), Decimal("10")))
-        self.assertFalse(prices_agree(Decimal("1.00"), Decimal("1.1000001"), Decimal("10")))
+        self.assertTrue(prices_agree(Decimal("1.00"), Decimal("1.10"), Decimal(10)))
+        self.assertFalse(
+            prices_agree(Decimal("1.00"), Decimal("1.1000001"), Decimal(10))
+        )
 
     def test_no_float_is_accepted(self):
-        self.assertIsNone(price_deviation_pct(1.0, Decimal("1")))
-        self.assertFalse(prices_agree(0.1 + 0.2, Decimal("0.3"), Decimal("1")))
+        self.assertIsNone(price_deviation_pct(1.0, Decimal(1)))
+        self.assertFalse(prices_agree(0.1 + 0.2, Decimal("0.3"), Decimal(1)))
 
     def test_zero_negative_and_nan_prices_never_agree(self):
-        for bad in (Decimal("0"), Decimal("-1"), Decimal("NaN"), Decimal("Infinity")):
+        for bad in (Decimal(0), Decimal(-1), Decimal("NaN"), Decimal("Infinity")):
             with self.subTest(bad=bad):
-                self.assertFalse(prices_agree(bad, Decimal("1"), Decimal("50")))
+                self.assertFalse(prices_agree(bad, Decimal(1), Decimal(50)))
 
     def test_freshness_window_and_future_timestamps(self):
-        now = Decimal("1000")
-        self.assertTrue(is_fresh(Decimal("940"), now, 60))
-        self.assertFalse(is_fresh(Decimal("939"), now, 60))
-        self.assertFalse(is_fresh(Decimal("1001"), now, 60))  # future observation is invalid
+        now = Decimal(1000)
+        self.assertTrue(is_fresh(Decimal(940), now, 60))
+        self.assertFalse(is_fresh(Decimal(939), now, 60))
+        self.assertFalse(
+            is_fresh(Decimal(1001), now, 60)
+        )  # future observation is invalid
 
     def test_freshness_rejects_bad_inputs(self):
-        self.assertFalse(is_fresh(1000, Decimal("1000"), 60))
-        self.assertFalse(is_fresh(Decimal("1000"), Decimal("1000"), 0))
-        self.assertFalse(is_fresh(Decimal("NaN"), Decimal("1000"), 60))
+        self.assertFalse(is_fresh(1000, Decimal(1000), 60))
+        self.assertFalse(is_fresh(Decimal(1000), Decimal(1000), 0))
+        self.assertFalse(is_fresh(Decimal("NaN"), Decimal(1000), 60))
 
 
 if __name__ == "__main__":

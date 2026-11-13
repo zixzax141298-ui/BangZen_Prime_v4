@@ -1,4 +1,5 @@
 """Read-only Helius getAccountInfo adapter for verified SPL mint decimals."""
+
 from __future__ import annotations
 
 import base64
@@ -10,10 +11,10 @@ from typing import Any
 
 from bangzen_prime.domain.mint_metadata import (
     REJECTED,
+    SUPPORTED_TOKEN_PROGRAMS,
     UNAVAILABLE,
     VERIFIED,
     MintMetadataEvidence,
-    SUPPORTED_TOKEN_PROGRAMS,
 )
 from bangzen_prime.domain.tokens import validate_mint
 from bangzen_prime.errors import DomainError, ExternalServiceError
@@ -90,8 +91,12 @@ class HeliusMintMetadataReader:
         value = result.get("value")
         if value is None:
             return MintMetadataEvidence(
-                mint=mint, validation_status=UNAVAILABLE, observed_at=observed_at,
-                source=SERVICE, slot=slot, reason_codes=("MINT_ACCOUNT_NOT_FOUND",),
+                mint=mint,
+                validation_status=UNAVAILABLE,
+                observed_at=observed_at,
+                source=SERVICE,
+                slot=slot,
+                reason_codes=("MINT_ACCOUNT_NOT_FOUND",),
             )
         if not isinstance(value, dict):
             raise HeliusMintMetadataMalformed("account value must be an object")
@@ -99,47 +104,73 @@ class HeliusMintMetadataReader:
         owner = value.get("owner")
         if not isinstance(owner, str) or owner not in SUPPORTED_TOKEN_PROGRAMS:
             return MintMetadataEvidence(
-                mint=mint, validation_status=REJECTED, observed_at=observed_at,
-                source=SERVICE, slot=slot, token_program=owner if isinstance(owner, str) else None,
+                mint=mint,
+                validation_status=REJECTED,
+                observed_at=observed_at,
+                source=SERVICE,
+                slot=slot,
+                token_program=owner if isinstance(owner, str) else None,
                 reason_codes=("UNSUPPORTED_MINT_OWNER_PROGRAM",),
             )
         if value.get("executable") is not False:
             return MintMetadataEvidence(
-                mint=mint, validation_status=REJECTED, observed_at=observed_at,
-                source=SERVICE, slot=slot, token_program=owner,
+                mint=mint,
+                validation_status=REJECTED,
+                observed_at=observed_at,
+                source=SERVICE,
+                slot=slot,
+                token_program=owner,
                 reason_codes=("MINT_ACCOUNT_MUST_NOT_BE_EXECUTABLE",),
             )
 
         data = value.get("data")
         if (
-            not isinstance(data, (list, tuple)) or len(data) != 2
-            or data[1] != "base64" or not isinstance(data[0], str)
+            not isinstance(data, (list, tuple))
+            or len(data) != 2
+            or data[1] != "base64"
+            or not isinstance(data[0], str)
         ):
             raise HeliusMintMetadataMalformed("account data must be a base64 tuple")
         try:
             raw = base64.b64decode(data[0], validate=True)
         except (binascii.Error, ValueError):
-            raise HeliusMintMetadataMalformed("account data is not valid base64") from None
+            raise HeliusMintMetadataMalformed(
+                "account data is not valid base64"
+            ) from None
         space = value.get("space")
         if space is not None and (
             isinstance(space, bool) or not isinstance(space, int) or space != len(raw)
         ):
-            raise HeliusMintMetadataMalformed("account space does not match decoded data")
+            raise HeliusMintMetadataMalformed(
+                "account space does not match decoded data"
+            )
         if owner == _TOKEN_PROGRAM and len(raw) != _MINT_BASE_SIZE:
-            raise HeliusMintMetadataMalformed("classic Token Program mint must be exactly 82 bytes")
+            raise HeliusMintMetadataMalformed(
+                "classic Token Program mint must be exactly 82 bytes"
+            )
         additional_data_length = 0
         if owner == _TOKEN_2022_PROGRAM:
             if len(raw) < _MINT_BASE_SIZE:
-                raise HeliusMintMetadataMalformed("Token-2022 mint is shorter than its base layout")
+                raise HeliusMintMetadataMalformed(
+                    "Token-2022 mint is shorter than its base layout"
+                )
             if len(raw) > _MINT_BASE_SIZE:
                 if len(raw) < 166 or len(raw) == 355:
-                    raise HeliusMintMetadataMalformed("Token-2022 extended mint layout has an invalid size")
+                    raise HeliusMintMetadataMalformed(
+                        "Token-2022 extended mint layout has an invalid size"
+                    )
                 if raw[82:165] != bytes(83):
-                    raise HeliusMintMetadataMalformed("Token-2022 mint padding is invalid")
+                    raise HeliusMintMetadataMalformed(
+                        "Token-2022 mint padding is invalid"
+                    )
                 if raw[165] != 1:
                     return MintMetadataEvidence(
-                        mint=mint, validation_status=REJECTED, observed_at=observed_at,
-                        source=SERVICE, slot=slot, token_program=owner,
+                        mint=mint,
+                        validation_status=REJECTED,
+                        observed_at=observed_at,
+                        source=SERVICE,
+                        slot=slot,
+                        token_program=owner,
                         account_data_length=len(raw),
                         reason_codes=("TOKEN_2022_ACCOUNT_IS_NOT_MINT",),
                     )
@@ -152,16 +183,28 @@ class HeliusMintMetadataReader:
             raise HeliusMintMetadataMalformed("mint initialized flag is invalid")
         if initialized != 1:
             return MintMetadataEvidence(
-                mint=mint, validation_status=REJECTED, observed_at=observed_at,
-                source=SERVICE, slot=slot, token_program=owner,
-                account_data_length=len(raw), additional_data_length=additional_data_length,
+                mint=mint,
+                validation_status=REJECTED,
+                observed_at=observed_at,
+                source=SERVICE,
+                slot=slot,
+                token_program=owner,
+                account_data_length=len(raw),
+                additional_data_length=additional_data_length,
                 reason_codes=("MINT_NOT_INITIALIZED",),
             )
         supply = int.from_bytes(raw[36:44], "little", signed=False)
         decimals = raw[_DECIMALS_OFFSET]
         return MintMetadataEvidence(
-            mint=mint, validation_status=VERIFIED, observed_at=observed_at,
-            source=SERVICE, slot=slot, token_program=owner, decimals=decimals,
-            supply_raw=supply, is_initialized=True, account_data_length=len(raw),
+            mint=mint,
+            validation_status=VERIFIED,
+            observed_at=observed_at,
+            source=SERVICE,
+            slot=slot,
+            token_program=owner,
+            decimals=decimals,
+            supply_raw=supply,
+            is_initialized=True,
+            account_data_length=len(raw),
             additional_data_length=additional_data_length,
         )

@@ -10,7 +10,9 @@ from bangzen_prime.errors import DomainError
 
 def parse_decimal(value: Any, name: str) -> Decimal:
     if isinstance(value, bool) or isinstance(value, float):
-        raise DomainError(f"{name} must be a str, int or Decimal, not {type(value).__name__}")
+        raise DomainError(
+            f"{name} must be a str, int or Decimal, not {type(value).__name__}"
+        )
     if isinstance(value, Decimal):
         result = value
     elif isinstance(value, (int, str)):
@@ -49,6 +51,6 @@ def percent(value: Any, name: str, *, allow_zero: bool = True) -> Decimal:
 
 def unit_interval(value: Any, name: str) -> Decimal:
     result = parse_decimal(value, name)
-    if not (Decimal("0") <= result <= Decimal("1")):
+    if not (Decimal(0) <= result <= Decimal(1)):
         raise DomainError(f"{name} must be within [0, 1]")
     return result

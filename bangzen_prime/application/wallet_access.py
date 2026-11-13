@@ -26,7 +26,9 @@ class WalletRegistry:
             try:
                 validate_mint(public_address)
             except DomainError:
-                raise ValueError("wallet registry accepts only a valid Solana public address") from None
+                raise ValueError(
+                    "wallet registry accepts only a valid Solana public address"
+                ) from None
         self._public_address = public_address
 
     def __repr__(self) -> str:
@@ -98,7 +100,11 @@ class WalletAccessController:
         )
 
     def assert_signer_access(self) -> None:
-        raise WalletAccessDenied("wallet signing is disabled; no private key is available to BANGZEN")
+        raise WalletAccessDenied(
+            "wallet signing is disabled; no private key is available to BANGZEN"
+        )
 
     def assert_funds_usable(self) -> None:
-        raise WalletAccessDenied("wallet funds are not usable by BANGZEN in this release")
+        raise WalletAccessDenied(
+            "wallet funds are not usable by BANGZEN in this release"
+        )

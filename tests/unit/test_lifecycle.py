@@ -3,7 +3,6 @@ from datetime import UTC, datetime, timedelta
 
 from bangzen_prime.application.lifecycle import TokenPhase, assess_token_phase
 
-
 NOW = datetime(2026, 11, 12, 8, 0, tzinfo=UTC)
 
 

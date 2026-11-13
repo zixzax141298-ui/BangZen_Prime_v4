@@ -10,10 +10,10 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON_PATHS = tuple(
@@ -33,9 +33,7 @@ class Check:
     required_path: str | None = None
 
 
-def resolve_profile(
-    requested: str, environ: dict[str, str] | None = None
-) -> str:
+def resolve_profile(requested: str, environ: dict[str, str] | None = None) -> str:
     """Resolve auto without relying on a specific Linux distribution."""
     env = os.environ if environ is None else environ
     if requested != "auto":
@@ -227,9 +225,7 @@ def run_check(check: Check, timeout: int) -> dict[str, object]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="BANGZEN PRIME portable CI gate"
-    )
+    parser = argparse.ArgumentParser(description="BANGZEN PRIME portable CI gate")
     parser.add_argument(
         "--profile",
         choices=("auto", "termux", "vps", "github", "full"),
@@ -258,15 +254,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         status: sum(record["status"] == status for record in records)
         for status in statuses
     }
-    gate = (
-        "GREEN"
-        if counts["FAIL"] == 0 and counts["BLOCKED"] == 0
-        else "NOT GREEN"
-    )
+    gate = "GREEN" if counts["FAIL"] == 0 and counts["BLOCKED"] == 0 else "NOT GREEN"
     report = {
         "schema_version": "1.0",
         "project": "BANGZEN PRIME",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "requested_profile": args.profile,
         "resolved_profile": profile,
         "python": sys.version.split()[0],
@@ -278,12 +270,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     }
 
     print("\n=== GATE SUMMARY ===")
-    print(
-        " ".join(
-            f"{key.replace(' ', '_')}={value}"
-            for key, value in counts.items()
-        )
-    )
+    print(" ".join(f"{key.replace(' ', '_')}={value}" for key, value in counts.items()))
     print(f"GATE: {gate}")
 
     if args.report:

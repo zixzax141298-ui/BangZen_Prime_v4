@@ -65,9 +65,7 @@ def evaluate_mode(
         reasons.append("LIVE_EXECUTION_DISABLED_BY_POLICY")
 
     execution_available = (
-        mode.execution_requested
-        and not kill_switch_engaged
-        and live_execution_enabled
+        mode.execution_requested and not kill_switch_engaged and live_execution_enabled
     )
     return ModeSnapshot(
         mode=mode,

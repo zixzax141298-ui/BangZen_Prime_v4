@@ -20,8 +20,10 @@ class FakeAsyncClient:
 class SybilAdapterEvidenceTests(unittest.TestCase):
     def run_report(self, outcomes):
         adapter = SybilAdapter("https://example.invalid", timeout=1)
+
         async def find_funder(_client, holder):
             return outcomes[holder]
+
         adapter._find_funder = find_funder
         with patch(
             "bangzen_prime.infrastructure.adapters.onchain.sybil_adapter.httpx.AsyncClient",
@@ -35,32 +37,38 @@ class SybilAdapterEvidenceTests(unittest.TestCase):
             )
 
     def test_all_observations_without_cluster_are_explicitly_clear(self):
-        report = self.run_report({
-            "wallet-a": ("SELF", None),
-            "wallet-b": ("SELF", None),
-            "wallet-c": ("SELF", None),
-        })
+        report = self.run_report(
+            {
+                "wallet-a": ("SELF", None),
+                "wallet-b": ("SELF", None),
+                "wallet-c": ("SELF", None),
+            }
+        )
         self.assertTrue(report.available)
         self.assertIs(report.is_bundled, False)
         self.assertEqual(report.reason, "safe_no_cluster")
 
     def test_unavailable_funder_data_is_unknown_not_bundled(self):
-        report = self.run_report({
-            "wallet-a": ("UNAVAILABLE", None),
-            "wallet-b": ("SELF", None),
-            "wallet-c": ("SELF", None),
-        })
+        report = self.run_report(
+            {
+                "wallet-a": ("UNAVAILABLE", None),
+                "wallet-b": ("SELF", None),
+                "wallet-c": ("SELF", None),
+            }
+        )
         self.assertFalse(report.available)
         self.assertIsNone(report.is_bundled)
         self.assertEqual(report.reason, "funder_evidence_incomplete")
 
     def test_confirmed_cluster_remains_positive_even_with_other_unknowns(self):
-        report = self.run_report({
-            "wallet-a": ("FUNDED", "funder-x"),
-            "wallet-b": ("FUNDED", "funder-x"),
-            "wallet-c": ("FUNDED", "funder-x"),
-            "wallet-d": ("UNAVAILABLE", None),
-        })
+        report = self.run_report(
+            {
+                "wallet-a": ("FUNDED", "funder-x"),
+                "wallet-b": ("FUNDED", "funder-x"),
+                "wallet-c": ("FUNDED", "funder-x"),
+                "wallet-d": ("UNAVAILABLE", None),
+            }
+        )
         self.assertTrue(report.available)
         self.assertIs(report.is_bundled, True)
         self.assertEqual(report.cluster_size, 3)
@@ -69,7 +77,12 @@ class SybilAdapterEvidenceTests(unittest.TestCase):
     def test_missing_optional_helius_configuration_is_unavailable(self):
         report = asyncio.run(
             SybilAdapter("").check_sybil_cluster(
-                "ignored-mint", [{"address": "wallet-a"}, {"address": "wallet-b"}, {"address": "wallet-c"}]
+                "ignored-mint",
+                [
+                    {"address": "wallet-a"},
+                    {"address": "wallet-b"},
+                    {"address": "wallet-c"},
+                ],
             )
         )
         self.assertFalse(report.available)

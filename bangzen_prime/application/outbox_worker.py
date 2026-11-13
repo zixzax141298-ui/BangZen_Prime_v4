@@ -30,9 +30,16 @@ class WorkerStats:
 
 
 class OutboxWorker:
-    def __init__(self, *, db: Database, bus: EventBus, clock: Callable[[], datetime],
-                 max_attempts: int = 5, base_backoff: timedelta = timedelta(seconds=5),
-                 lease: timedelta = timedelta(seconds=30)) -> None:
+    def __init__(
+        self,
+        *,
+        db: Database,
+        bus: EventBus,
+        clock: Callable[[], datetime],
+        max_attempts: int = 5,
+        base_backoff: timedelta = timedelta(seconds=5),
+        lease: timedelta = timedelta(seconds=30),
+    ) -> None:
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
         self._db = db
@@ -49,8 +56,12 @@ class OutboxWorker:
             rows = OutboxStore(conn).claim_due(now, self._lease, limit)
         stats.claimed = len(rows)
         for row in rows:
-            event = DomainEvent(name=row.event_name, payload=row.payload,
-                                occurred_at=row.occurred_at, event_id=row.id)
+            event = DomainEvent(
+                name=row.event_name,
+                payload=row.payload,
+                occurred_at=row.occurred_at,
+                event_id=row.id,
+            )
             try:
                 self._bus.dispatch(event)
             except EventDispatchError as exc:
@@ -64,8 +75,12 @@ class OutboxWorker:
                         logger.error("outbox event %s dead-lettered", row.id)
                     else:
                         delay = self._base_backoff * (2 ** (attempts - 1))
-                        store.reschedule(row.id, attempts=attempts, available_at=now + delay,
-                                         error=str(exc))
+                        store.reschedule(
+                            row.id,
+                            attempts=attempts,
+                            available_at=now + delay,
+                            error=str(exc),
+                        )
                         stats.retried += 1
                 continue
             with self._db.transaction() as conn:

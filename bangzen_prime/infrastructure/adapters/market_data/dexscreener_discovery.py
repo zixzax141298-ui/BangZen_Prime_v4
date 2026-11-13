@@ -71,5 +71,8 @@ class DexScreenerDiscoveryAdapter:
             if len(candidates) >= limit:
                 break
         if skipped:
-            logger.info("DexScreener discovery skipped %d unsupported or invalid entries", skipped)
+            logger.info(
+                "DexScreener discovery skipped %d unsupported or invalid entries",
+                skipped,
+            )
         return candidates

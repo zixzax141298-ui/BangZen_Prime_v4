@@ -40,10 +40,14 @@ class YellowstoneStream:
         if importlib.util.find_spec("grpc") is None:
             raise ConfigurationError("grpc package is not installed")
         if importlib.util.find_spec(self.STUB_MODULE) is None:
-            raise ConfigurationError("Yellowstone protobuf stubs are not generated; see RUNBOOK")
+            raise ConfigurationError(
+                "Yellowstone protobuf stubs are not generated; see RUNBOOK"
+            )
         self._endpoint = endpoint
         self._token = token
         self._stubs = importlib.import_module(self.STUB_MODULE)
 
-    def events(self) -> Iterator[ChainEvent]:  # pragma: no cover - requires network and stubs
+    def events(
+        self,
+    ) -> Iterator[ChainEvent]:  # pragma: no cover - requires network and stubs
         raise ConfigurationError("live gRPC streaming is not enabled in this build")

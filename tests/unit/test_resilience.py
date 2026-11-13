@@ -15,18 +15,32 @@ from bangzen_prime.infrastructure.resilience.policies import (
 
 def caller(clock, *, attempts=3, threshold=5, rate=600, sleeps=None):
     sleeps = sleeps if sleeps is not None else []
-    return ResilientCaller(
-        "svc", retry=RetryPolicy(max_attempts=attempts, base_delay_seconds=1.0, max_delay_seconds=8.0),
-        limiter=TokenBucket(rate_per_minute=rate, clock=clock),
-        breaker=CircuitBreaker("svc", failure_threshold=threshold, recovery_seconds=30, clock=clock),
-        health=HealthMonitor(), sleep=sleeps.append, clock=clock), sleeps
+    return (
+        ResilientCaller(
+            "svc",
+            retry=RetryPolicy(
+                max_attempts=attempts, base_delay_seconds=1.0, max_delay_seconds=8.0
+            ),
+            limiter=TokenBucket(rate_per_minute=rate, clock=clock),
+            breaker=CircuitBreaker(
+                "svc", failure_threshold=threshold, recovery_seconds=30, clock=clock
+            ),
+            health=HealthMonitor(),
+            sleep=sleeps.append,
+            clock=clock,
+        ),
+        sleeps,
+    )
 
 
 class RetryTest(unittest.TestCase):
     def test_retryable_then_success(self):
         clock = FakeClock()
         c, sleeps = caller(clock)
-        outcomes = [ExternalServiceError("x", service="svc", retryable=True, status=500), "ok"]
+        outcomes = [
+            ExternalServiceError("x", service="svc", retryable=True, status=500),
+            "ok",
+        ]
 
         def fn():
             item = outcomes.pop(0)
@@ -43,7 +57,9 @@ class RetryTest(unittest.TestCase):
 
         def fn():
             calls.append(1)
-            raise ExternalServiceError("bad", service="svc", retryable=False, status=404)
+            raise ExternalServiceError(
+                "bad", service="svc", retryable=False, status=404
+            )
 
         with self.assertRaises(ExternalServiceError):
             c.call(fn)
@@ -56,7 +72,9 @@ class RetryTest(unittest.TestCase):
 
         def fn():
             calls.append(1)
-            raise ExternalServiceError("down", service="svc", retryable=True, status=503)
+            raise ExternalServiceError(
+                "down", service="svc", retryable=True, status=503
+            )
 
         with self.assertRaises(ExternalServiceError):
             c.call(fn)
@@ -64,7 +82,9 @@ class RetryTest(unittest.TestCase):
         self.assertEqual(sleeps, [1.0, 2.0])
 
     def test_retry_after_is_honoured_and_capped(self):
-        policy = RetryPolicy(max_attempts=3, base_delay_seconds=1.0, max_delay_seconds=8.0)
+        policy = RetryPolicy(
+            max_attempts=3, base_delay_seconds=1.0, max_delay_seconds=8.0
+        )
         self.assertEqual(policy.delay_for(1, retry_after=3.0), 3.0)
         self.assertEqual(policy.delay_for(1, retry_after=600.0), 8.0)
         self.assertEqual(policy.delay_for(4, retry_after=None), 8.0)
@@ -92,7 +112,9 @@ class CircuitBreakerTest(unittest.TestCase):
 
     def test_half_open_then_recovers_on_success(self):
         clock = FakeClock()
-        breaker = CircuitBreaker("b", failure_threshold=1, recovery_seconds=30, clock=clock)
+        breaker = CircuitBreaker(
+            "b", failure_threshold=1, recovery_seconds=30, clock=clock
+        )
         breaker.record_failure()
         self.assertEqual(breaker.state, CircuitState.OPEN)
         clock.advance(29)
@@ -104,7 +126,9 @@ class CircuitBreakerTest(unittest.TestCase):
 
     def test_half_open_failure_reopens(self):
         clock = FakeClock()
-        breaker = CircuitBreaker("b", failure_threshold=1, recovery_seconds=10, clock=clock)
+        breaker = CircuitBreaker(
+            "b", failure_threshold=1, recovery_seconds=10, clock=clock
+        )
         breaker.record_failure()
         clock.advance(10)
         self.assertEqual(breaker.state, CircuitState.HALF_OPEN)
@@ -116,8 +140,13 @@ class CircuitBreakerTest(unittest.TestCase):
         c, _ = caller(clock, attempts=1, threshold=1)
         for _ in range(3):
             with self.assertRaises(ExternalServiceError):
-                c.call(lambda: (_ for _ in ()).throw(
-                    ExternalServiceError("404", service="svc", retryable=False, status=404)))
+                c.call(
+                    lambda: (_ for _ in ()).throw(
+                        ExternalServiceError(
+                            "404", service="svc", retryable=False, status=404
+                        )
+                    )
+                )
         self.assertEqual(c.call(lambda: "fine"), "fine")
 
 
@@ -149,9 +178,12 @@ class LimiterAndHealthTest(unittest.TestCase):
         c, _ = caller(clock, attempts=1)
         c.call(lambda: 1)
         with self.assertRaises(ExternalServiceError):
-            c.call(lambda: (_ for _ in ()).throw(
-                ExternalServiceError("e", service="svc", retryable=False)))
-        self.assertEqual(c._health.snapshot(), {"svc": {"ok": 1, "failed": 1}})  # noqa: SLF001
+            c.call(
+                lambda: (_ for _ in ()).throw(
+                    ExternalServiceError("e", service="svc", retryable=False)
+                )
+            )
+        self.assertEqual(c._health.snapshot(), {"svc": {"ok": 1, "failed": 1}})
 
 
 class HttpMappingTest(unittest.TestCase):
@@ -160,43 +192,77 @@ class HttpMappingTest(unittest.TestCase):
             if isinstance(response, Exception):
                 raise response
             return response
+
         return t
 
     def test_success_returns_json(self):
-        data = get_json(service="s", url="u", timeout=1,
-                        transport=self.transport(HttpResponse(200, b'{"a": 1}', {})))
+        data = get_json(
+            service="s",
+            url="u",
+            timeout=1,
+            transport=self.transport(HttpResponse(200, b'{"a": 1}', {})),
+        )
         self.assertEqual(data, {"a": 1})
 
     def test_429_is_retryable_and_carries_retry_after(self):
         with self.assertRaises(ExternalServiceError) as ctx:
-            get_json(service="s", url="u", timeout=1,
-                     transport=self.transport(HttpResponse(429, b"", {"Retry-After": "7"})))
+            get_json(
+                service="s",
+                url="u",
+                timeout=1,
+                transport=self.transport(HttpResponse(429, b"", {"Retry-After": "7"})),
+            )
         self.assertTrue(ctx.exception.retryable)
         self.assertEqual(ctx.exception.retry_after, 7.0)
 
     def test_429_with_bad_retry_after_has_none(self):
         with self.assertRaises(ExternalServiceError) as ctx:
-            get_json(service="s", url="u", timeout=1,
-                     transport=self.transport(HttpResponse(429, b"", {"retry-after": "soon"})))
+            get_json(
+                service="s",
+                url="u",
+                timeout=1,
+                transport=self.transport(
+                    HttpResponse(429, b"", {"retry-after": "soon"})
+                ),
+            )
         self.assertIsNone(ctx.exception.retry_after)
 
     def test_5xx_retryable_4xx_not(self):
         with self.assertRaises(ExternalServiceError) as ctx:
-            get_json(service="s", url="u", timeout=1, transport=self.transport(HttpResponse(502, b"", {})))
+            get_json(
+                service="s",
+                url="u",
+                timeout=1,
+                transport=self.transport(HttpResponse(502, b"", {})),
+            )
         self.assertTrue(ctx.exception.retryable)
         with self.assertRaises(ExternalServiceError) as ctx:
-            get_json(service="s", url="u", timeout=1, transport=self.transport(HttpResponse(403, b"", {})))
+            get_json(
+                service="s",
+                url="u",
+                timeout=1,
+                transport=self.transport(HttpResponse(403, b"", {})),
+            )
         self.assertFalse(ctx.exception.retryable)
 
     def test_timeout_is_retryable(self):
         with self.assertRaises(ExternalServiceError) as ctx:
-            get_json(service="s", url="u", timeout=1, transport=self.transport(TransportTimeout()))
+            get_json(
+                service="s",
+                url="u",
+                timeout=1,
+                transport=self.transport(TransportTimeout()),
+            )
         self.assertTrue(ctx.exception.retryable)
 
     def test_malformed_json_not_retryable(self):
         with self.assertRaises(ExternalServiceError) as ctx:
-            get_json(service="s", url="u", timeout=1,
-                     transport=self.transport(HttpResponse(200, b"{not json", {})))
+            get_json(
+                service="s",
+                url="u",
+                timeout=1,
+                transport=self.transport(HttpResponse(200, b"{not json", {})),
+            )
         self.assertFalse(ctx.exception.retryable)
 
 

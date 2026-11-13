@@ -12,7 +12,9 @@ from bangzen_prime.infrastructure.adapters.chain.helius_history import (
     HeliusHistoryReader,
 )
 from bangzen_prime.infrastructure.http import HttpResponse
-from bangzen_prime.infrastructure.persistence.sqlite.chain_history import ChainHistoryStore
+from bangzen_prime.infrastructure.persistence.sqlite.chain_history import (
+    ChainHistoryStore,
+)
 from bangzen_prime.infrastructure.persistence.sqlite.database import Database
 
 ADDRESS = "11111111111111111111111111111111"
@@ -38,23 +40,44 @@ class FakeTransport:
 
 def reader(payload):
     transport = FakeTransport(payload)
-    return HeliusHistoryReader(
-        api_key="secret-key",
-        transport=transport,
-        caller=FakeCaller(),
-        timeout=3,
-        clock=lambda: NOW,
-    ), transport
+    return (
+        HeliusHistoryReader(
+            api_key="secret-key",
+            transport=transport,
+            caller=FakeCaller(),
+            timeout=3,
+            clock=lambda: NOW,
+        ),
+        transport,
+    )
 
 
 class HistoryReaderTests(unittest.TestCase):
     def test_signature_page_is_validated_and_newest_first(self):
-        client, transport = reader({"jsonrpc": "2.0", "id": 1, "result": [
-            {"signature": SIG_A, "slot": 10, "blockTime": 100, "err": None,
-             "confirmationStatus": "finalized", "memo": None},
-            {"signature": SIG_B, "slot": 9, "blockTime": None, "err": {"x": 1},
-             "confirmationStatus": "confirmed", "memo": "memo"},
-        ]})
+        client, transport = reader(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": [
+                    {
+                        "signature": SIG_A,
+                        "slot": 10,
+                        "blockTime": 100,
+                        "err": None,
+                        "confirmationStatus": "finalized",
+                        "memo": None,
+                    },
+                    {
+                        "signature": SIG_B,
+                        "slot": 9,
+                        "blockTime": None,
+                        "err": {"x": 1},
+                        "confirmationStatus": "confirmed",
+                        "memo": "memo",
+                    },
+                ],
+            }
+        )
         page = client.signatures_for_address(ADDRESS, limit=3)
         self.assertEqual([item.signature for item in page.entries], [SIG_A, SIG_B])
         self.assertTrue(page.exhausted)
@@ -63,9 +86,15 @@ class HistoryReaderTests(unittest.TestCase):
         self.assertIn("api-key=secret-key", transport.requests[0].url)
 
     def test_full_page_is_not_mislabelled_exhausted(self):
-        client, _ = reader({"jsonrpc": "2.0", "id": 1, "result": [
-            {"signature": SIG_A, "slot": 10, "blockTime": 100, "err": None}
-        ]})
+        client, _ = reader(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": [
+                    {"signature": SIG_A, "slot": 10, "blockTime": 100, "err": None}
+                ],
+            }
+        )
         page = client.signatures_for_address(ADDRESS, limit=1)
         self.assertFalse(page.exhausted)
 
@@ -104,14 +133,25 @@ class HistoryReaderTests(unittest.TestCase):
             client.signatures_for_address(ADDRESS)
 
     def test_transaction_parses_accounts_fees_and_balances(self):
-        client, _ = reader({"jsonrpc": "2.0", "id": 1, "result": {
-            "slot": 42, "blockTime": 123, "transaction": {"message": {
-                "accountKeys": [{"pubkey": ADDRESS}, ADDRESS]
-            }}, "meta": {
-                "fee": 5000, "preBalances": [100, 200], "postBalances": [95, 205],
-                "err": None
+        client, _ = reader(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "slot": 42,
+                    "blockTime": 123,
+                    "transaction": {
+                        "message": {"accountKeys": [{"pubkey": ADDRESS}, ADDRESS]}
+                    },
+                    "meta": {
+                        "fee": 5000,
+                        "preBalances": [100, 200],
+                        "postBalances": [95, 205],
+                        "err": None,
+                    },
+                },
             }
-        }})
+        )
         tx = client.transaction(SIG_A)
         self.assertTrue(tx.metadata_available)
         self.assertEqual(tx.fee_lamports, 5000)
@@ -119,18 +159,38 @@ class HistoryReaderTests(unittest.TestCase):
         self.assertEqual(tx.pre_balances, (100, 200))
 
     def test_transaction_without_meta_is_marked_unavailable(self):
-        client, _ = reader({"jsonrpc": "2.0", "id": 1, "result": {
-            "slot": 42, "blockTime": None, "transaction": {"message": {"accountKeys": []}},
-            "meta": None
-        }})
+        client, _ = reader(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "slot": 42,
+                    "blockTime": None,
+                    "transaction": {"message": {"accountKeys": []}},
+                    "meta": None,
+                },
+            }
+        )
         tx = client.transaction(SIG_A)
         self.assertFalse(tx.metadata_available)
 
     def test_transaction_balance_length_mismatch_rejected(self):
-        client, _ = reader({"jsonrpc": "2.0", "id": 1, "result": {
-            "slot": 42, "transaction": {"message": {"accountKeys": [ADDRESS]}},
-            "meta": {"fee": 1, "preBalances": [], "postBalances": [1], "err": None}
-        }})
+        client, _ = reader(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "slot": 42,
+                    "transaction": {"message": {"accountKeys": [ADDRESS]}},
+                    "meta": {
+                        "fee": 1,
+                        "preBalances": [],
+                        "postBalances": [1],
+                        "err": None,
+                    },
+                },
+            }
+        )
         with self.assertRaises(HeliusHistoryMalformed):
             client.transaction(SIG_A)
 
@@ -148,6 +208,7 @@ class ChainHistoryStoreTests(unittest.TestCase):
         from bangzen_prime.infrastructure.adapters.chain.helius_history import (
             HistoricalSignaturePage,
         )
+
         return HistoricalSignaturePage(
             address=ADDRESS,
             entries=tuple(entries),
@@ -160,7 +221,10 @@ class ChainHistoryStoreTests(unittest.TestCase):
         )
 
     def test_page_insert_and_checkpoint_are_atomic_and_idempotent(self):
-        from bangzen_prime.infrastructure.adapters.chain.helius_history import HistoricalSignature
+        from bangzen_prime.infrastructure.adapters.chain.helius_history import (
+            HistoricalSignature,
+        )
+
         entry = HistoricalSignature(SIG_A, 10, 100, False, "finalized", None)
         self.assertEqual(self.store.record_page(self._page([entry])), 1)
         self.assertEqual(self.store.record_page(self._page([entry])), 0)
@@ -171,7 +235,10 @@ class ChainHistoryStoreTests(unittest.TestCase):
         self.assertEqual(checkpoint.pages_fetched, 2)
 
     def test_more_available_checkpoint_retains_cursor(self):
-        from bangzen_prime.infrastructure.adapters.chain.helius_history import HistoricalSignature
+        from bangzen_prime.infrastructure.adapters.chain.helius_history import (
+            HistoricalSignature,
+        )
+
         entries = [
             HistoricalSignature(SIG_A, 10, 100, False, None, None),
             HistoricalSignature(SIG_B, 9, 99, False, None, None),

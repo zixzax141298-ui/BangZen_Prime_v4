@@ -74,9 +74,7 @@ class TestProfileChecks(unittest.TestCase):
         fake_manifest.is_file.return_value = True
         with patch("tools.ci.RUST_MANIFEST", fake_manifest):
             names = {check.name for check in build_checks("vps")}
-        self.assertTrue(
-            {"Cargo fmt", "Cargo test", "Cargo Audit"}.issubset(names)
-        )
+        self.assertTrue({"Cargo fmt", "Cargo test", "Cargo Audit"}.issubset(names))
 
 
 if __name__ == "__main__":

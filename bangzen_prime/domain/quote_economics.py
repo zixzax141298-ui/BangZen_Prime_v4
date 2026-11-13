@@ -3,6 +3,7 @@
 This module is pure domain logic. It consumes already validated mint/price evidence;
 it does not fetch RPC data, infer missing fees, or authorize execution.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from bangzen_prime.domain.execution_economics import ExecutionCostBreakdown
 from bangzen_prime.domain.tokens import validate_mint
 from bangzen_prime.errors import DomainError
 
-ZERO = Decimal("0")
+ZERO = Decimal(0)
 VERIFIED = "VERIFIED"
 ENTRY = "ENTRY"
 EXIT = "EXIT"
@@ -225,7 +226,7 @@ def _quote_rate(
     name: str,
 ) -> tuple[Decimal, str]:
     if mint == quote_mint:
-        return Decimal("1"), "IDENTITY"
+        return Decimal(1), "IDENTITY"
     if not isinstance(evidence, VerifiedQuotePrice):
         raise DomainError(f"{name} conversion evidence is unavailable")
     if evidence.mint != mint or evidence.quote_mint != quote_mint:
@@ -259,11 +260,17 @@ def normalize_jupiter_quote(
         observed_at=quote_observed_at, now=now, max_age=max_age, name="Jupiter quote"
     )
     _require_mint_evidence(
-        input_mint_metadata, mint=quote.input_mint, now=now, max_age=max_age,
+        input_mint_metadata,
+        mint=quote.input_mint,
+        now=now,
+        max_age=max_age,
         name="input",
     )
     _require_mint_evidence(
-        output_mint_metadata, mint=quote.output_mint, now=now, max_age=max_age,
+        output_mint_metadata,
+        mint=quote.output_mint,
+        now=now,
+        max_age=max_age,
         name="output",
     )
     input_amount = _token_units(
@@ -273,8 +280,12 @@ def normalize_jupiter_quote(
         quote.output_amount_raw, output_mint_metadata.decimals, "output amount"
     )
     input_rate, input_price_source = _quote_rate(
-        mint=quote.input_mint, quote_mint=quote_currency_mint, evidence=input_price,
-        now=now, max_age=max_age, name="input price",
+        mint=quote.input_mint,
+        quote_mint=quote_currency_mint,
+        evidence=input_price,
+        now=now,
+        max_age=max_age,
+        name="input price",
     )
     with localcontext() as context:
         context.prec = 100
@@ -287,15 +298,22 @@ def normalize_jupiter_quote(
     if quote.platform_fee is not None:
         fee_mint = quote.platform_fee.fee_mint
         _require_mint_evidence(
-            fee_mint_metadata, mint=fee_mint, now=now, max_age=max_age,
+            fee_mint_metadata,
+            mint=fee_mint,
+            now=now,
+            max_age=max_age,
             name="fee",
         )
         fee_amount = _token_units(
             quote.platform_fee.amount_raw, fee_mint_metadata.decimals, "platform fee"
         )
         fee_rate, fee_source = _quote_rate(
-            mint=fee_mint, quote_mint=quote_currency_mint, evidence=fee_price,
-            now=now, max_age=max_age, name="fee price",
+            mint=fee_mint,
+            quote_mint=quote_currency_mint,
+            evidence=fee_price,
+            now=now,
+            max_age=max_age,
+            name="fee price",
         )
         with localcontext() as context:
             context.prec = 100

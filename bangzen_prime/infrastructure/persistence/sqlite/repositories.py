@@ -13,8 +13,12 @@ from decimal import Decimal
 
 from bangzen_prime.domain.signals import PriceLevels, RejectReason, Signal, SignalStatus
 from bangzen_prime.domain.tokens import PairSnapshot, SafetyAssessment, Token
-from bangzen_prime.infrastructure.persistence.sqlite.database import Database, parse_iso, utc_iso
 from bangzen_prime.infrastructure.persistence.sqlite.attempts import AttemptStore
+from bangzen_prime.infrastructure.persistence.sqlite.database import (
+    Database,
+    parse_iso,
+    utc_iso,
+)
 from bangzen_prime.infrastructure.persistence.sqlite.outbox import AuditLog, OutboxStore
 
 
@@ -26,12 +30,20 @@ class TokenRepository:
         self._conn.execute(
             "INSERT INTO tokens (id, chain, mint, symbol, name, created_at) VALUES (?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(id) DO UPDATE SET symbol = excluded.symbol, name = excluded.name",
-            (str(token.id), token.chain, token.mint, token.symbol, token.name, utc_iso(at)),
+            (
+                str(token.id),
+                token.chain,
+                token.mint,
+                token.symbol,
+                token.name,
+                utc_iso(at),
+            ),
         )
 
     def get_by_mint(self, chain: str, mint: str) -> dict | None:
-        row = self._conn.execute("SELECT * FROM tokens WHERE chain = ? AND mint = ?",
-                                 (chain, mint)).fetchone()
+        row = self._conn.execute(
+            "SELECT * FROM tokens WHERE chain = ? AND mint = ?", (chain, mint)
+        ).fetchone()
         return dict(row) if row else None
 
 
@@ -46,9 +58,17 @@ class PairRepository:
             "ON CONFLICT(id) DO UPDATE SET price_usd = excluded.price_usd,"
             " liquidity_usd = excluded.liquidity_usd, volume_24h_usd = excluded.volume_24h_usd,"
             " observed_at = excluded.observed_at",
-            (str(pair.pair_id), str(pair.token_id), pair.chain, pair.pair_address, pair.dex_id,
-             str(pair.price_usd), str(pair.liquidity_usd), str(pair.volume_24h_usd),
-             utc_iso(pair.observed_at)),
+            (
+                str(pair.pair_id),
+                str(pair.token_id),
+                pair.chain,
+                pair.pair_address,
+                pair.dex_id,
+                str(pair.price_usd),
+                str(pair.liquidity_usd),
+                str(pair.volume_24h_usd),
+                utc_iso(pair.observed_at),
+            ),
         )
 
 
@@ -66,7 +86,8 @@ class PriceRepository:
         """Return the most recent `limit` prices in chronological order."""
         rows = self._conn.execute(
             "SELECT price_usd FROM price_samples WHERE token_id = ? ORDER BY id DESC LIMIT ?",
-            (str(token_id), limit)).fetchall()
+            (str(token_id), limit),
+        ).fetchall()
         return [Decimal(row["price_usd"]) for row in reversed(rows)]
 
 
@@ -78,8 +99,13 @@ class SafetyRepository:
         self._conn.execute(
             "INSERT INTO safety_checks (token_id, risk_score, rugged, source, checked_at)"
             " VALUES (?, ?, ?, ?, ?)",
-            (str(token_id), str(assessment.risk_score), int(assessment.rugged),
-             assessment.source, utc_iso(assessment.checked_at)),
+            (
+                str(token_id),
+                str(assessment.risk_score),
+                int(assessment.rugged),
+                assessment.source,
+                utc_iso(assessment.checked_at),
+            ),
         )
 
 
@@ -92,24 +118,34 @@ class SignalRepository:
         self._conn.execute(
             "INSERT INTO signals (id, token_id, pair_id, status, score, entry_price, stop_loss,"
             " take_profit, confidence, reasons, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (str(signal.id), str(signal.token_id), str(signal.pair_id), signal.status.value,
-             str(signal.score),
-             str(levels.entry) if levels else None,
-             str(levels.stop_loss) if levels else None,
-             str(levels.take_profit) if levels else None,
-             str(signal.confidence) if signal.confidence is not None else None,
-             json.dumps([r.value for r in signal.reasons]), utc_iso(signal.created_at)),
+            (
+                str(signal.id),
+                str(signal.token_id),
+                str(signal.pair_id),
+                signal.status.value,
+                str(signal.score),
+                str(levels.entry) if levels else None,
+                str(levels.stop_loss) if levels else None,
+                str(levels.take_profit) if levels else None,
+                str(signal.confidence) if signal.confidence is not None else None,
+                json.dumps([r.value for r in signal.reasons]),
+                utc_iso(signal.created_at),
+            ),
         )
 
     def get(self, signal_id: uuid.UUID) -> Signal | None:
-        row = self._conn.execute("SELECT * FROM signals WHERE id = ?",
-                                 (str(signal_id),)).fetchone()
+        row = self._conn.execute(
+            "SELECT * FROM signals WHERE id = ?", (str(signal_id),)
+        ).fetchone()
         if row is None:
             return None
         levels = None
         if row["status"] == SignalStatus.ACCEPTED.value:
-            levels = PriceLevels(Decimal(row["entry_price"]), Decimal(row["stop_loss"]),
-                                 Decimal(row["take_profit"]))
+            levels = PriceLevels(
+                Decimal(row["entry_price"]),
+                Decimal(row["stop_loss"]),
+                Decimal(row["take_profit"]),
+            )
         return Signal(
             signal_id=uuid.UUID(row["id"]),
             token_id=uuid.UUID(row["token_id"]),
@@ -119,12 +155,15 @@ class SignalRepository:
             reasons=tuple(RejectReason(r) for r in json.loads(row["reasons"])),
             created_at=parse_iso(row["created_at"]),
             levels=levels,
-            confidence=Decimal(row["confidence"]) if row["confidence"] is not None else None,
+            confidence=(
+                Decimal(row["confidence"]) if row["confidence"] is not None else None
+            ),
         )
 
     def count_by_status(self, status: SignalStatus) -> int:
-        row = self._conn.execute("SELECT COUNT(*) AS n FROM signals WHERE status = ?",
-                                 (status.value,)).fetchone()
+        row = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM signals WHERE status = ?", (status.value,)
+        ).fetchone()
         return int(row["n"])
 
 

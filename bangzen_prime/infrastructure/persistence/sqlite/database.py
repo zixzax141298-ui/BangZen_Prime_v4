@@ -29,7 +29,9 @@ def load_migrations() -> list[tuple[int, str, str]]:
     for entry in resources.files(_MIGRATION_PACKAGE).iterdir():
         match = _MIGRATION_NAME.match(entry.name)
         if match:
-            found.append((int(match.group(1)), match.group(2), entry.read_text("utf-8")))
+            found.append(
+                (int(match.group(1)), match.group(2), entry.read_text("utf-8"))
+            )
     found.sort(key=lambda item: item[0])
     versions = [v for v, _, _ in found]
     if versions != list(range(1, len(versions) + 1)):
@@ -56,7 +58,9 @@ def parse_iso(value: str) -> datetime:
 class Database:
     def __init__(self, path: str = ":memory:") -> None:
         self.path = path
-        self._conn = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
+        self._conn = sqlite3.connect(
+            path, isolation_level=None, check_same_thread=False
+        )
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.execute("PRAGMA busy_timeout = 5000")
@@ -118,7 +122,10 @@ class Database:
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)"
             )
-        done = {row["version"] for row in self.query_all("SELECT version FROM schema_migrations")}
+        done = {
+            row["version"]
+            for row in self.query_all("SELECT version FROM schema_migrations")
+        }
         for version, name, sql in load_migrations():
             if version in done:
                 continue

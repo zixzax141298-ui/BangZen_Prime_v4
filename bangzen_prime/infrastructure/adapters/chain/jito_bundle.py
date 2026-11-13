@@ -61,16 +61,24 @@ def relay_bundle(
         raise BroadcastRefused("bundle relay is refused unless allow_broadcast=True")
     if not 1 <= len(transactions_b64) <= 5:
         raise ValueError("a bundle holds 1 to 5 transactions")
-    body = json.dumps({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "sendBundle",
-        "params": [transactions_b64, {"encoding": "base64"}],
-    }).encode("utf-8")
+    body = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "sendBundle",
+            "params": [transactions_b64, {"encoding": "base64"}],
+        }
+    ).encode("utf-8")
     request = HttpRequest(
-        "POST", block_engine, {"Content-Type": "application/json"}, body, timeout,
+        "POST",
+        block_engine,
+        {"Content-Type": "application/json"},
+        body,
+        timeout,
     )
-    payload = caller.call(lambda: request_json(service=_SERVICE, request=request, transport=transport))
+    payload = caller.call(
+        lambda: request_json(service=_SERVICE, request=request, transport=transport)
+    )
     result = payload.get("result") if isinstance(payload, dict) else None
     if not isinstance(result, str) or not result:
         raise ValueError("jito sendBundle returned no bundle id")

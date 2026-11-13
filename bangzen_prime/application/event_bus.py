@@ -28,13 +28,19 @@ class Subscription:
 class ProcessedStore:
     """Protocol-like contract: is_processed / mark_processed per subscriber and event id."""
 
-    def is_processed(self, subscriber: str, event_id: str) -> bool: ...  # pragma: no cover
+    def is_processed(
+        self, subscriber: str, event_id: str
+    ) -> bool: ...  # pragma: no cover
 
-    def mark_processed(self, subscriber: str, event_id: str, at: datetime) -> None: ...  # pragma: no cover
+    def mark_processed(
+        self, subscriber: str, event_id: str, at: datetime
+    ) -> None: ...  # pragma: no cover
 
 
 class EventBus:
-    def __init__(self, processed: ProcessedStore, clock: Callable[[], datetime]) -> None:
+    def __init__(
+        self, processed: ProcessedStore, clock: Callable[[], datetime]
+    ) -> None:
         self._processed = processed
         self._clock = clock
         self._subs: dict[str, list[Subscription]] = {}
@@ -53,8 +59,12 @@ class EventBus:
             try:
                 sub.handler(event)
             except Exception as exc:  # noqa: BLE001 - collected and re-raised below
-                logger.error("subscriber %s failed for %s: %s", sub.name, event.name,
-                             type(exc).__name__)
+                logger.error(
+                    "subscriber %s failed for %s: %s",
+                    sub.name,
+                    event.name,
+                    type(exc).__name__,
+                )
                 failures.append((sub.name, exc))
                 continue
             self._processed.mark_processed(sub.name, event.event_id, self._clock())

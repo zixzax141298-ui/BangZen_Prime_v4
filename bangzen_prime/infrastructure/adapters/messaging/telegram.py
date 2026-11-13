@@ -87,8 +87,15 @@ class TelegramNotifier:
         if last is not None and now - last < self.cooldown_seconds:
             logger.info("telegram message suppressed by cooldown")
             return
-        url = self._url("sendMessage", {"chat_id": self.chat_id, "text": message,
-                                        "parse_mode": "HTML", "disable_web_page_preview": "true"})
+        url = self._url(
+            "sendMessage",
+            {
+                "chat_id": self.chat_id,
+                "text": message,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": "true",
+            },
+        )
         self.caller.call(lambda: self._request(url))
         self._recent[key] = now
 
@@ -96,23 +103,43 @@ class TelegramNotifier:
         try:
             response: HttpResponse = self.transport(url, self.timeout)
         except TransportTimeout:
-            raise ExternalServiceError("telegram timed out", service=SERVICE, retryable=True) from None
+            raise ExternalServiceError(
+                "telegram timed out", service=SERVICE, retryable=True
+            ) from None
         if response.status == 429:
-            raise ExternalServiceError("telegram rate limited", service=SERVICE, retryable=True,
-                                       status=429, retry_after=_retry_after_from_body(response.body))
+            raise ExternalServiceError(
+                "telegram rate limited",
+                service=SERVICE,
+                retryable=True,
+                status=429,
+                retry_after=_retry_after_from_body(response.body),
+            )
         if response.status >= 500:
-            raise ExternalServiceError(f"telegram server error {response.status}",
-                                       service=SERVICE, retryable=True, status=response.status)
+            raise ExternalServiceError(
+                f"telegram server error {response.status}",
+                service=SERVICE,
+                retryable=True,
+                status=response.status,
+            )
         if response.status >= 400:
-            raise ExternalServiceError(f"telegram rejected message ({response.status})",
-                                       service=SERVICE, retryable=False, status=response.status)
+            raise ExternalServiceError(
+                f"telegram rejected message ({response.status})",
+                service=SERVICE,
+                retryable=False,
+                status=response.status,
+            )
 
 
 STATUS_COMMANDS = {"/status", "/health"}
 
 
-def handle_command(*, chat_id: str, command: str, allowed_chat_ids: Sequence[str],
-                   status_text: Callable[[], str]) -> str | None:
+def handle_command(
+    *,
+    chat_id: str,
+    command: str,
+    allowed_chat_ids: Sequence[str],
+    status_text: Callable[[], str],
+) -> str | None:
     """Read-only command handling. Unknown chats and unknown commands get no reply."""
     if chat_id not in allowed_chat_ids:
         logger.warning("telegram command from unauthorised chat ignored")

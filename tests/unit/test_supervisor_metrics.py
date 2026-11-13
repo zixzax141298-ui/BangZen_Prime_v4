@@ -6,8 +6,15 @@ from bangzen_prime.infrastructure.observability.metrics import Metrics
 
 def sup(workers, emergency=False, sleeps=None):
     sleeps = sleeps if sleeps is not None else []
-    return Supervisor(workers=workers, emergency_stop=lambda: emergency, metrics=Metrics(),
-                      sleep=sleeps.append), sleeps
+    return (
+        Supervisor(
+            workers=workers,
+            emergency_stop=lambda: emergency,
+            metrics=Metrics(),
+            sleep=sleeps.append,
+        ),
+        sleeps,
+    )
 
 
 class SupervisorTest(unittest.TestCase):
@@ -50,8 +57,13 @@ class SupervisorTest(unittest.TestCase):
 
     def test_emergency_stop_skips_only_order_placing_workers(self):
         ran = []
-        s, _ = sup([WorkerSpec("orders", lambda: ran.append("o"), places_orders=True),
-                    WorkerSpec("outbox", lambda: ran.append("x"))], emergency=True)
+        s, _ = sup(
+            [
+                WorkerSpec("orders", lambda: ran.append("o"), places_orders=True),
+                WorkerSpec("outbox", lambda: ran.append("x")),
+            ],
+            emergency=True,
+        )
         result = s.run_cycle()
         self.assertEqual(result, {"orders": "SKIPPED_EMERGENCY_STOP", "outbox": "OK"})
         self.assertEqual(ran, ["x"])

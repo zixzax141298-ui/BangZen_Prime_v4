@@ -3,6 +3,7 @@
 Only a complete, validated BUY response can pass. Missing holder data, provider failures,
 malformed output, duplicate JSON keys, extra prose, and invalid context all become SKIP.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -86,12 +87,21 @@ def _valid_context(ctx: TradeContext) -> str | None:
         return "INVALID_SAFETY_DATA"
     if ctx.rugged:
         return "RUGGED"
-    if ctx.token_phase not in {"UNKNOWN", "LAUNCH", "EARLY", "GROWTH", "MATURE", "CEX_LISTED"}:
+    if ctx.token_phase not in {
+        "UNKNOWN",
+        "LAUNCH",
+        "EARLY",
+        "GROWTH",
+        "MATURE",
+        "CEX_LISTED",
+    }:
         return "INVALID_PHASE"
     if ctx.market_sentiment_pct is not None:
-        if (not isinstance(ctx.market_sentiment_pct, Decimal)
-                or not ctx.market_sentiment_pct.is_finite()
-                or not Decimal(0) <= ctx.market_sentiment_pct <= Decimal(100)):
+        if (
+            not isinstance(ctx.market_sentiment_pct, Decimal)
+            or not ctx.market_sentiment_pct.is_finite()
+            or not Decimal(0) <= ctx.market_sentiment_pct <= Decimal(100)
+        ):
             return "INVALID_MARKET_SENTIMENT"
     if ctx.market_sentiment_age_seconds is not None and (
         isinstance(ctx.market_sentiment_age_seconds, bool)
@@ -103,11 +113,18 @@ def _valid_context(ctx: TradeContext) -> str | None:
         return "INVALID_MARKET_SENTIMENT"
     if ctx.top10_holder_share_pct is None or ctx.holder_count is None:
         return "HOLDER_DATA_UNAVAILABLE"
-    if isinstance(ctx.holder_count, bool) or not isinstance(ctx.holder_count, int) or ctx.holder_count <= 0:
+    if (
+        isinstance(ctx.holder_count, bool)
+        or not isinstance(ctx.holder_count, int)
+        or ctx.holder_count <= 0
+    ):
         return "INVALID_HOLDER_DATA"
     values = (
-        ctx.liquidity_usd, ctx.volume_24h_usd, ctx.top10_holder_share_pct,
-        ctx.heuristic_score, ctx.safety_risk_score,
+        ctx.liquidity_usd,
+        ctx.volume_24h_usd,
+        ctx.top10_holder_share_pct,
+        ctx.heuristic_score,
+        ctx.safety_risk_score,
     )
     if any(not isinstance(v, Decimal) or not v.is_finite() for v in values):
         return "INVALID_MARKET_DATA"
@@ -137,8 +154,11 @@ def build_user_prompt(ctx: TradeContext) -> str:
         "safety_risk_score": str(ctx.safety_risk_score),
         "rugged": ctx.rugged,
         "token_phase": ctx.token_phase,
-        "market_sentiment_pct": (str(ctx.market_sentiment_pct)
-                                 if ctx.market_sentiment_pct is not None else None),
+        "market_sentiment_pct": (
+            str(ctx.market_sentiment_pct)
+            if ctx.market_sentiment_pct is not None
+            else None
+        ),
         "market_sentiment_age_seconds": ctx.market_sentiment_age_seconds,
         "market_sentiment_trend": ctx.market_sentiment_trend,
     }
@@ -178,7 +198,11 @@ def parse_decision(text: str, threshold: Decimal) -> AIDecision:
         return fallback
     if not confidence.is_finite() or not Decimal(0) <= confidence <= Decimal(1):
         return fallback
-    if not isinstance(threshold, Decimal) or not threshold.is_finite() or not Decimal(0) <= threshold <= Decimal(1):
+    if (
+        not isinstance(threshold, Decimal)
+        or not threshold.is_finite()
+        or not Decimal(0) <= threshold <= Decimal(1)
+    ):
         return fallback
     if decision == "BUY" and confidence < threshold:
         return AIDecision("SKIP", confidence, "CONFIDENCE_BELOW_THRESHOLD", "model")
@@ -187,11 +211,21 @@ def parse_decision(text: str, threshold: Decimal) -> AIDecision:
 
 class AIBrain:
     def __init__(
-        self, provider: CompletionProvider, *, threshold: Decimal,
-        cache_ttl_seconds: float = 30.0, clock: Callable[[], float] = time.monotonic,
+        self,
+        provider: CompletionProvider,
+        *,
+        threshold: Decimal,
+        cache_ttl_seconds: float = 30.0,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        if not isinstance(threshold, Decimal) or not threshold.is_finite() or not Decimal(0) <= threshold <= Decimal(1):
-            raise ValueError("AI confidence threshold must be a finite Decimal in [0, 1]")
+        if (
+            not isinstance(threshold, Decimal)
+            or not threshold.is_finite()
+            or not Decimal(0) <= threshold <= Decimal(1)
+        ):
+            raise ValueError(
+                "AI confidence threshold must be a finite Decimal in [0, 1]"
+            )
         if not 0 <= cache_ttl_seconds <= 300:
             raise ValueError("AI cache TTL must be within [0, 300] seconds")
         self._provider = provider
@@ -231,7 +265,8 @@ class AIBrain:
             with self._cache_lock:
                 if len(self._cache) >= 1024:
                     self._cache = {
-                        key: value for key, value in self._cache.items()
+                        key: value
+                        for key, value in self._cache.items()
                         if value[0] > now
                     }
                 if len(self._cache) >= 1024:
@@ -249,6 +284,7 @@ def ai_decision_gate(
     Any context construction failure returns a fallback SKIP decision. The caller can
     distinguish model-origin BUY from fallback output and must still enforce all other gates.
     """
+
     def gate(input_mint: str, output_mint: str, amount: Decimal) -> AIDecision:
         try:
             context = context_for(input_mint, output_mint, amount)
@@ -257,15 +293,18 @@ def ai_decision_gate(
             return brain.decide(context)
         except Exception:
             return AIDecision("SKIP", Decimal(0), "AI_CONTEXT_UNAVAILABLE", "fallback")
+
     return gate
 
 
 def ai_gate(brain: AIBrain, context_for: Callable[[object], TradeContext]):
     """Return a deterministic veto gate. Context or model errors always deny."""
+
     def gate(request: object) -> tuple[bool, str]:
         try:
             decision = brain.decide(context_for(request))
         except Exception:
             return False, "AI_CONTEXT_UNAVAILABLE"
         return decision.decision == "BUY", decision.reason
+
     return gate

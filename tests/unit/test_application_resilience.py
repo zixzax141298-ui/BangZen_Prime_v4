@@ -26,9 +26,7 @@ class ApplicationResilienceAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await breaker.call(operation), "safe")
 
     async def test_failure_is_recorded_and_propagated(self):
-        breaker = CircuitBreaker(
-            "market", ResiliencePolicy(failure_threshold=1)
-        )
+        breaker = CircuitBreaker("market", ResiliencePolicy(failure_threshold=1))
 
         async def operation():
             raise RuntimeError("provider unavailable")

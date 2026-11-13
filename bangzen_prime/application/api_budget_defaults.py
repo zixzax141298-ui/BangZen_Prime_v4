@@ -7,8 +7,13 @@ from collections.abc import Callable
 from bangzen_prime.infrastructure.api_budget import BudgetRegistry, ProviderBudget
 
 
-def default_budget_registry(clock: Callable[[], float], *, scans_per_minute: int) -> BudgetRegistry:
+def default_budget_registry(
+    clock: Callable[[], float], *, scans_per_minute: int
+) -> BudgetRegistry:
     return BudgetRegistry(
-        [ProviderBudget("dexscreener", scans_per_minute), ProviderBudget("rugcheck", scans_per_minute)],
+        [
+            ProviderBudget("dexscreener", scans_per_minute),
+            ProviderBudget("rugcheck", scans_per_minute),
+        ],
         clock,
     )

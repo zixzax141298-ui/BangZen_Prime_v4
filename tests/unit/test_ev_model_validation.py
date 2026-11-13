@@ -4,7 +4,6 @@ from decimal import Decimal
 from bangzen_prime.domain.ev_model import calculate_ev_model, validate_trade_plan
 from bangzen_prime.errors import DomainError
 
-
 D = Decimal
 
 
@@ -25,11 +24,15 @@ class ExpectedValueValidationTest(unittest.TestCase):
         with self.assertRaises(DomainError):
             calculate_ev_model(D("10"), D("1"), tp1_pct=D("50"), tp2_pct=D("50"))
         with self.assertRaises(DomainError):
-            calculate_ev_model(D("10"), D("1"), tp1_pct=D("50"), breakeven_buffer=D("51"))
+            calculate_ev_model(
+                D("10"), D("1"), tp1_pct=D("50"), breakeven_buffer=D("51")
+            )
 
     def test_valid_ev_outputs_are_finite(self):
         result = calculate_ev_model(D("15"), D("1.2"))
-        self.assertEqual(set(result), {"p1_random", "q_random", "p1_breakeven", "ev_random_net"})
+        self.assertEqual(
+            set(result), {"p1_random", "q_random", "p1_breakeven", "ev_random_net"}
+        )
         self.assertTrue(all(value.is_finite() for value in result.values()))
 
     def test_trade_plan_rejects_nan_and_negative_costs(self):

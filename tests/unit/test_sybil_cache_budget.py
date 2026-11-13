@@ -106,8 +106,12 @@ class SybilCacheTests(unittest.TestCase):
                 return_value=FakeAsyncClient(),
             ):
                 return await asyncio.gather(
-                    adapter.check_sybil_cluster("mint-a", ["wallet-a", "wallet-b", "wallet-c"]),
-                    adapter.check_sybil_cluster("mint-b", ["wallet-a", "wallet-b", "wallet-c"]),
+                    adapter.check_sybil_cluster(
+                        "mint-a", ["wallet-a", "wallet-b", "wallet-c"]
+                    ),
+                    adapter.check_sybil_cluster(
+                        "mint-b", ["wallet-a", "wallet-b", "wallet-c"]
+                    ),
                 )
 
         first, second = asyncio.run(run_both())
@@ -125,16 +129,22 @@ class SybilCacheTests(unittest.TestCase):
         client = FakeRpcClient()
 
         async def run():
-            await adapter._rpc_call(client, "getSignaturesForAddress", ["wallet", {"limit": 20}])
+            await adapter._rpc_call(
+                client, "getSignaturesForAddress", ["wallet", {"limit": 20}]
+            )
             with self.assertRaisesRegex(RuntimeError, "budget_exhausted"):
-                await adapter._rpc_call(client, "getSignaturesForAddress", ["wallet", {"limit": 20}])
+                await adapter._rpc_call(
+                    client, "getSignaturesForAddress", ["wallet", {"limit": 20}]
+                )
 
         asyncio.run(run())
         self.assertEqual(client.calls, 1)
 
         now[0] = 60.0
         asyncio.run(
-            adapter._rpc_call(client, "getSignaturesForAddress", ["wallet", {"limit": 20}])
+            adapter._rpc_call(
+                client, "getSignaturesForAddress", ["wallet", {"limit": 20}]
+            )
         )
         self.assertEqual(client.calls, 2)
 

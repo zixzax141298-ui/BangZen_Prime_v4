@@ -9,14 +9,16 @@ logger = logging.getLogger(__name__)
 MIN_WALLETS_FOR_BUNDLE = 5
 MAX_TIME_WINDOW_SEC = Decimal("3.0")
 
+
 @dataclass(frozen=True)
 class SequentialBundleReport:
     is_sequential_bundle: bool
     funder: str = ""
     wallet_count: int = 0
-    time_window_sec: Decimal = Decimal("0")
+    time_window_sec: Decimal = Decimal(0)
     wallets: tuple[str, ...] = ()
     reason: str = ""
+
 
 class SequentialBundleDetector:
     """
@@ -51,8 +53,7 @@ class SequentialBundleDetector:
         if not isinstance(transactions, list):
             logger.warning("[SequentialBundle] Invalid transactions type, fail-closed.")
             return SequentialBundleReport(
-                is_sequential_bundle=True,
-                reason="invalid_data_type"
+                is_sequential_bundle=True, reason="invalid_data_type"
             )
 
         buys_by_funder: dict[str, list[dict[str, Any]]] = {}
@@ -61,16 +62,19 @@ class SequentialBundleDetector:
             if not isinstance(tx, dict):
                 logger.warning("[SequentialBundle] Corrupted transaction, fail-closed.")
                 return SequentialBundleReport(
-                    is_sequential_bundle=True,
-                    reason="corrupted_transaction"
+                    is_sequential_bundle=True, reason="corrupted_transaction"
                 )
 
             tx_type = str(tx.get("type", "buy")).lower()
             if tx_type != "buy":
                 continue
 
-            wallet = str(tx.get("wallet") or tx.get("buyer") or tx.get("user") or "").strip()
-            funder = str(tx.get("funder") or tx.get("source") or tx.get("funding_wallet") or "").strip()
+            wallet = str(
+                tx.get("wallet") or tx.get("buyer") or tx.get("user") or ""
+            ).strip()
+            funder = str(
+                tx.get("funder") or tx.get("source") or tx.get("funding_wallet") or ""
+            ).strip()
 
             raw_ts = tx.get("timestamp", tx.get("time", tx.get("blockTime", None)))
             ts = self._safe_decimal(raw_ts)
@@ -82,10 +86,12 @@ class SequentialBundleDetector:
             if wallet == funder:
                 continue
 
-            buys_by_funder.setdefault(funder, []).append({
-                "wallet": wallet,
-                "timestamp": ts,
-            })
+            buys_by_funder.setdefault(funder, []).append(
+                {
+                    "wallet": wallet,
+                    "timestamp": ts,
+                }
+            )
 
         # Sliding window: cek setiap funder apakah ada 5+ wallet dalam < 3 detik
         for funder, buys in buys_by_funder.items():
@@ -114,10 +120,9 @@ class SequentialBundleDetector:
                             wallet_count=len(window_wallets),
                             time_window_sec=diff.quantize(Decimal("0.01")),
                             wallets=tuple(sorted(window_wallets)),
-                            reason=f"sybil_bundle_{len(window_wallets)}_wallets_{diff:.2f}s"
+                            reason=f"sybil_bundle_{len(window_wallets)}_wallets_{diff:.2f}s",
                         )
 
         return SequentialBundleReport(
-            is_sequential_bundle=False,
-            reason="clean_no_bundle_detected"
+            is_sequential_bundle=False, reason="clean_no_bundle_detected"
         )

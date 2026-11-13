@@ -20,26 +20,34 @@ NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
 
 def mint(mint_address, decimals, *, observed=NOW, status="VERIFIED"):
     return VerifiedMintDecimals(
-        mint=mint_address, decimals=decimals, source="solana_rpc:getAccountInfo",
-        observed_at=observed, validation_status=status, slot=400,
+        mint=mint_address,
+        decimals=decimals,
+        source="solana_rpc:getAccountInfo",
+        observed_at=observed,
+        validation_status=status,
+        slot=400,
     )
 
 
 def price(mint_address, quote_mint, value, *, observed=NOW, status="VERIFIED"):
     return VerifiedQuotePrice(
-        mint=mint_address, quote_mint=quote_mint, quote_per_token=D(value),
-        source="validated_market_price", observed_at=observed,
-        validation_status=status, slot=400,
+        mint=mint_address,
+        quote_mint=quote_mint,
+        quote_per_token=D(value),
+        source="validated_market_price",
+        observed_at=observed,
+        validation_status=status,
+        slot=400,
     )
 
 
 def quote(*, fee=True):
     return RawSwapQuote(
-        input_mint=SOL_MINT, output_mint=TOKEN_MINT,
-        input_amount_raw=D("1000000000"), output_amount_raw=D("25000000"),
-        platform_fee=(
-            RawPlatformFee(D("1000000"), SOL_MINT) if fee else None
-        ),
+        input_mint=SOL_MINT,
+        output_mint=TOKEN_MINT,
+        input_amount_raw=D("1000000000"),
+        output_amount_raw=D("25000000"),
+        platform_fee=(RawPlatformFee(D("1000000"), SOL_MINT) if fee else None),
     )
 
 
@@ -72,8 +80,10 @@ class NormalizeJupiterQuoteTests(unittest.TestCase):
     def test_converts_non_quote_fee_using_verified_fresh_price(self):
         other_fee_mint = TOKEN_MINT
         changed_quote = RawSwapQuote(
-            input_mint=SOL_MINT, output_mint=TOKEN_MINT,
-            input_amount_raw=D("1000000000"), output_amount_raw=D("25000000"),
+            input_mint=SOL_MINT,
+            output_mint=TOKEN_MINT,
+            input_amount_raw=D("1000000000"),
+            output_amount_raw=D("25000000"),
             platform_fee=RawPlatformFee(D("250000"), other_fee_mint),
         )
         result = self.normalize(
@@ -119,9 +129,11 @@ class NormalizeJupiterQuoteTests(unittest.TestCase):
 
     def test_rejects_stale_and_future_mint_or_quote_evidence(self):
         with self.assertRaises(DomainError):
-            self.normalize(input_mint_metadata=mint(
-                SOL_MINT, 9, observed=NOW - timedelta(seconds=31)
-            ))
+            self.normalize(
+                input_mint_metadata=mint(
+                    SOL_MINT, 9, observed=NOW - timedelta(seconds=31)
+                )
+            )
         with self.assertRaises(DomainError):
             self.normalize(quote_observed_at=NOW + timedelta(seconds=1))
 
@@ -136,8 +148,10 @@ class NormalizeJupiterQuoteTests(unittest.TestCase):
 
     def test_rejects_missing_stale_or_mismatched_fee_price(self):
         changed_quote = RawSwapQuote(
-            input_mint=SOL_MINT, output_mint=TOKEN_MINT,
-            input_amount_raw=D("1000000000"), output_amount_raw=D("25000000"),
+            input_mint=SOL_MINT,
+            output_mint=TOKEN_MINT,
+            input_amount_raw=D("1000000000"),
+            output_amount_raw=D("25000000"),
             platform_fee=RawPlatformFee(D("100000"), TOKEN_MINT),
         )
         with self.assertRaises(DomainError):
@@ -149,8 +163,9 @@ class NormalizeJupiterQuoteTests(unittest.TestCase):
             self.normalize(
                 quote=changed_quote,
                 fee_mint_metadata=mint(TOKEN_MINT, 6),
-                fee_price=price(TOKEN_MINT, SOL_MINT, "0.02",
-                                observed=NOW - timedelta(seconds=31)),
+                fee_price=price(
+                    TOKEN_MINT, SOL_MINT, "0.02", observed=NOW - timedelta(seconds=31)
+                ),
             )
 
     def test_rejects_invalid_decimals_and_price(self):

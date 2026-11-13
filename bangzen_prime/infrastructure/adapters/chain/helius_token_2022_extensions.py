@@ -1,4 +1,5 @@
 """Read-only Helius reader for mint-owner classification and Token-2022 extension evidence."""
+
 from __future__ import annotations
 
 import base64
@@ -12,8 +13,8 @@ from bangzen_prime.domain.token_2022_extension_config import (
     decode_token_2022_extension_configurations,
 )
 from bangzen_prime.domain.token_2022_extension_evidence import (
-    Token2022ExtensionEvidence,
     UNAVAILABLE,
+    Token2022ExtensionEvidence,
 )
 from bangzen_prime.domain.token_2022_extensions import (
     PARTIAL,
@@ -90,7 +91,9 @@ class HeliusToken2022ExtensionReader:
 
         result = self._account_info(mint)
         if not isinstance(result, dict):
-            raise HeliusToken2022ExtensionMalformed("getAccountInfo result must be an object")
+            raise HeliusToken2022ExtensionMalformed(
+                "getAccountInfo result must be an object"
+            )
         context = result.get("context")
         if not isinstance(context, dict):
             raise HeliusToken2022ExtensionMalformed("RPC context missing")
@@ -101,7 +104,11 @@ class HeliusToken2022ExtensionReader:
         value = result.get("value")
         if value is None:
             return self._evidence(
-                mint, observed_at, slot, UNAVAILABLE, reason_codes=("MINT_ACCOUNT_NOT_FOUND",)
+                mint,
+                observed_at,
+                slot,
+                UNAVAILABLE,
+                reason_codes=("MINT_ACCOUNT_NOT_FOUND",),
             )
         if not isinstance(value, dict):
             raise HeliusToken2022ExtensionMalformed("account value must be an object")
@@ -109,13 +116,20 @@ class HeliusToken2022ExtensionReader:
         owner = value.get("owner")
         if owner not in {TOKEN_2022_PROGRAM, TOKEN_PROGRAM_ID}:
             return self._evidence(
-                mint, observed_at, slot, REJECTED,
+                mint,
+                observed_at,
+                slot,
+                REJECTED,
                 token_program=owner if isinstance(owner, str) else None,
                 reason_codes=("UNSUPPORTED_MINT_OWNER_PROGRAM",),
             )
         if value.get("executable") is not False:
             return self._evidence(
-                mint, observed_at, slot, REJECTED, token_program=owner,
+                mint,
+                observed_at,
+                slot,
+                REJECTED,
+                token_program=owner,
                 reason_codes=("MINT_ACCOUNT_MUST_NOT_BE_EXECUTABLE",),
             )
 
@@ -126,52 +140,87 @@ class HeliusToken2022ExtensionReader:
             or data[1] != "base64"
             or not isinstance(data[0], str)
         ):
-            raise HeliusToken2022ExtensionMalformed("account data must be a base64 tuple")
+            raise HeliusToken2022ExtensionMalformed(
+                "account data must be a base64 tuple"
+            )
         try:
             raw = base64.b64decode(data[0], validate=True)
         except (binascii.Error, ValueError):
-            raise HeliusToken2022ExtensionMalformed("account data is not valid base64") from None
+            raise HeliusToken2022ExtensionMalformed(
+                "account data is not valid base64"
+            ) from None
 
         space = value.get("space")
         if space is not None and (
             isinstance(space, bool) or not isinstance(space, int) or space != len(raw)
         ):
-            raise HeliusToken2022ExtensionMalformed("account space does not match decoded data")
+            raise HeliusToken2022ExtensionMalformed(
+                "account space does not match decoded data"
+            )
 
         # Confirm classic SPL Token accounts are actual initialized 82-byte Mint layouts.
         if owner == TOKEN_PROGRAM_ID:
             if len(raw) != _MINT_BASE_SIZE:
                 return self._evidence(
-                    mint, observed_at, slot, REJECTED, token_program=owner,
-                    account_data_length=len(raw), reason_codes=("TOKEN_PROGRAM_ACCOUNT_NOT_MINT",),
+                    mint,
+                    observed_at,
+                    slot,
+                    REJECTED,
+                    token_program=owner,
+                    account_data_length=len(raw),
+                    reason_codes=("TOKEN_PROGRAM_ACCOUNT_NOT_MINT",),
                 )
             if raw[45] not in (0, 1):
-                raise HeliusToken2022ExtensionMalformed("classic mint initialized flag is invalid")
+                raise HeliusToken2022ExtensionMalformed(
+                    "classic mint initialized flag is invalid"
+                )
             if raw[45] != 1:
                 return self._evidence(
-                    mint, observed_at, slot, REJECTED, token_program=owner,
-                    account_data_length=len(raw), reason_codes=("MINT_NOT_INITIALIZED",),
+                    mint,
+                    observed_at,
+                    slot,
+                    REJECTED,
+                    token_program=owner,
+                    account_data_length=len(raw),
+                    reason_codes=("MINT_NOT_INITIALIZED",),
                 )
             mint_authority_tag = int.from_bytes(raw[0:4], "little")
             freeze_authority_tag = int.from_bytes(raw[46:50], "little")
             if mint_authority_tag not in (0, 1) or freeze_authority_tag not in (0, 1):
                 return self._evidence(
-                    mint, observed_at, slot, REJECTED, token_program=owner,
-                    account_data_length=len(raw), reason_codes=("CLASSIC_SPL_MINT_LAYOUT_INVALID",),
+                    mint,
+                    observed_at,
+                    slot,
+                    REJECTED,
+                    token_program=owner,
+                    account_data_length=len(raw),
+                    reason_codes=("CLASSIC_SPL_MINT_LAYOUT_INVALID",),
                 )
             return self._evidence(
-                mint, observed_at, slot, REJECTED, token_program=owner,
-                account_data_length=len(raw), reason_codes=("CLASSIC_SPL_MINT_CONFIRMED",),
+                mint,
+                observed_at,
+                slot,
+                REJECTED,
+                token_program=owner,
+                account_data_length=len(raw),
+                reason_codes=("CLASSIC_SPL_MINT_CONFIRMED",),
             )
 
         if len(raw) < _MINT_BASE_SIZE:
-            raise HeliusToken2022ExtensionMalformed("Token-2022 mint is shorter than base layout")
+            raise HeliusToken2022ExtensionMalformed(
+                "Token-2022 mint is shorter than base layout"
+            )
         if raw[45] not in (0, 1):
             raise HeliusToken2022ExtensionMalformed("mint initialized flag is invalid")
         if raw[45] != 1:
             return self._evidence(
-                mint, observed_at, slot, REJECTED, token_program=owner,
-                account_data_length=len(raw), reason_codes=("MINT_NOT_INITIALIZED",),
+                mint,
+                observed_at,
+                slot,
+                REJECTED,
+                token_program=owner,
+                account_data_length=len(raw),
+                reason_codes=("MINT_NOT_INITIALIZED",),
             )
 
         if len(raw) == _MINT_BASE_SIZE:
@@ -183,12 +232,20 @@ class HeliusToken2022ExtensionReader:
             )
         else:
             if len(raw) < _EXTENDED_MINT_HEADER_SIZE or len(raw) == 355:
-                raise HeliusToken2022ExtensionMalformed("extended mint layout has invalid size")
+                raise HeliusToken2022ExtensionMalformed(
+                    "extended mint layout has invalid size"
+                )
             if raw[82:165] != bytes(83):
-                raise HeliusToken2022ExtensionMalformed("Token-2022 mint padding is invalid")
+                raise HeliusToken2022ExtensionMalformed(
+                    "Token-2022 mint padding is invalid"
+                )
             if raw[165] != 1:
                 return self._evidence(
-                    mint, observed_at, slot, REJECTED, token_program=owner,
+                    mint,
+                    observed_at,
+                    slot,
+                    REJECTED,
+                    token_program=owner,
                     account_data_length=len(raw),
                     reason_codes=("TOKEN_2022_ACCOUNT_IS_NOT_MINT",),
                 )
@@ -200,10 +257,12 @@ class HeliusToken2022ExtensionReader:
             REJECTED
             if parsed.validation_status == REJECTED
             or config.validation_status == REJECTED
-            else PARTIAL
-            if parsed.validation_status == PARTIAL
-            or config.validation_status == PARTIAL
-            else VERIFIED
+            else (
+                PARTIAL
+                if parsed.validation_status == PARTIAL
+                or config.validation_status == PARTIAL
+                else VERIFIED
+            )
         )
         return self._evidence(
             mint,
@@ -215,7 +274,9 @@ class HeliusToken2022ExtensionReader:
             extensions=parsed.extensions,
             risk_flags=tuple(dict.fromkeys(parsed.risk_flags + config.risk_flags)),
             unknown_extension_ids=parsed.unknown_extension_ids,
-            reason_codes=tuple(dict.fromkeys(parsed.reason_codes + config.reason_codes)),
+            reason_codes=tuple(
+                dict.fromkeys(parsed.reason_codes + config.reason_codes)
+            ),
             configuration=config,
         )
 

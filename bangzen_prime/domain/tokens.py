@@ -31,13 +31,17 @@ def validate_mint(mint: str) -> str:
 
 def token_identity(chain: str, address: str) -> uuid.UUID:
     """Same chain+address always yields the same UUID, across every use case."""
-    return uuid.uuid5(_IDENTITY_NAMESPACE, f"{validate_chain(chain)}:{validate_mint(address)}")
+    return uuid.uuid5(
+        _IDENTITY_NAMESPACE, f"{validate_chain(chain)}:{validate_mint(address)}"
+    )
 
 
 def pair_identity(chain: str, pair_address: str) -> uuid.UUID:
     if not isinstance(pair_address, str) or not pair_address.strip():
         raise DomainError("pair address must not be empty")
-    return uuid.uuid5(_IDENTITY_NAMESPACE, f"pair:{validate_chain(chain)}:{pair_address.strip()}")
+    return uuid.uuid5(
+        _IDENTITY_NAMESPACE, f"pair:{validate_chain(chain)}:{pair_address.strip()}"
+    )
 
 
 class Token(AggregateRoot):
@@ -71,18 +75,38 @@ class PairSnapshot:
 
     @classmethod
     def create(
-        cls, *, chain: str, pair_address: str, dex_id: str, base_mint: str,
-        base_symbol: str, price_usd: object, liquidity_usd: object,
-        volume_24h_usd: object, observed_at: datetime,
+        cls,
+        *,
+        chain: str,
+        pair_address: str,
+        dex_id: str,
+        base_mint: str,
+        base_symbol: str,
+        price_usd: object,
+        liquidity_usd: object,
+        volume_24h_usd: object,
+        observed_at: datetime,
         pair_created_at: datetime | None = None,
         source: str = "UNSPECIFIED",
     ) -> PairSnapshot:
         validate_chain(chain)
         validate_mint(base_mint)
-        if not isinstance(pair_address, str) or not pair_address.strip() or not isinstance(dex_id, str) or not dex_id.strip():
+        if (
+            not isinstance(pair_address, str)
+            or not pair_address.strip()
+            or not isinstance(dex_id, str)
+            or not dex_id.strip()
+        ):
             raise DomainError("pair address and dex id must not be empty")
-        if not isinstance(source, str) or not source.strip() or len(source) > 64 or not source.isprintable():
-            raise DomainError("market source must be a non-empty printable value of at most 64 characters")
+        if (
+            not isinstance(source, str)
+            or not source.strip()
+            or len(source) > 64
+            or not source.isprintable()
+        ):
+            raise DomainError(
+                "market source must be a non-empty printable value of at most 64 characters"
+            )
         return cls(
             chain=chain,
             pair_address=pair_address.strip(),
@@ -93,7 +117,9 @@ class PairSnapshot:
             liquidity_usd=non_negative(liquidity_usd, "liquidity_usd"),
             volume_24h_usd=non_negative(volume_24h_usd, "volume_24h_usd"),
             observed_at=ensure_utc(observed_at),
-            pair_created_at=ensure_utc(pair_created_at) if pair_created_at is not None else None,
+            pair_created_at=(
+                ensure_utc(pair_created_at) if pair_created_at is not None else None
+            ),
             source=source.strip(),
         )
 
@@ -122,14 +148,28 @@ class SafetyAssessment:
     checked_at: datetime
 
     @classmethod
-    def create(cls, *, chain: str, mint: str, risk_score: object, rugged: bool,
-               source: str, checked_at: datetime) -> SafetyAssessment:
+    def create(
+        cls,
+        *,
+        chain: str,
+        mint: str,
+        risk_score: object,
+        rugged: bool,
+        source: str,
+        checked_at: datetime,
+    ) -> SafetyAssessment:
         validate_chain(chain)
         validate_mint(mint)
         if not isinstance(rugged, bool):
             raise DomainError("rugged must be a boolean")
-        return cls(chain, mint, percent(risk_score, "risk_score"), rugged, source,
-                   ensure_utc(checked_at))
+        return cls(
+            chain,
+            mint,
+            percent(risk_score, "risk_score"),
+            rugged,
+            source,
+            ensure_utc(checked_at),
+        )
 
     def rejection_reason(self, max_risk_score: Decimal) -> str | None:
         """Return a reason code if the token must not proceed to scoring."""

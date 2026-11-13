@@ -4,6 +4,7 @@ Uses GET /order without a taker: no transaction is requested, built, signed, or 
 Amounts and fees remain in raw token units; callers must normalize decimals and quote-currency
 conversion before passing costs into execution_economics.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,7 +18,11 @@ from bangzen_prime.infrastructure.adapters.market_data.parsing import (
     require_str,
     to_decimal,
 )
-from bangzen_prime.infrastructure.http import HttpRequest, RequestTransport, request_json
+from bangzen_prime.infrastructure.http import (
+    HttpRequest,
+    RequestTransport,
+    request_json,
+)
 from bangzen_prime.infrastructure.resilience.policies import ResilientCaller
 
 JUPITER_V2_BASE = "https://api.jup.ag/swap/v2"
@@ -78,11 +83,13 @@ class JupiterQuoteV2Adapter:
         if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
             raise DomainError("amount must be a positive integer in raw token units")
 
-        query = urlencode({
-            "inputMint": input_mint,
-            "outputMint": output_mint,
-            "amount": str(amount),
-        })
+        query = urlencode(
+            {
+                "inputMint": input_mint,
+                "outputMint": output_mint,
+                "amount": str(amount),
+            }
+        )
         request = HttpRequest(
             "GET",
             f"{self._base}/order?{query}",
@@ -106,22 +113,40 @@ class JupiterQuoteV2Adapter:
         # Quote-only contract: a non-null transaction means the request unexpectedly
         # crossed into transaction construction and must not be consumed by this adapter.
         if payload.get("transaction") not in (None, ""):
-            raise MalformedData(SERVICE, "quote-only response unexpectedly contains a transaction")
+            raise MalformedData(
+                SERVICE, "quote-only response unexpectedly contains a transaction"
+            )
 
-        request_id = require_str(payload.get("requestId"), service=SERVICE, field="requestId")
+        request_id = require_str(
+            payload.get("requestId"), service=SERVICE, field="requestId"
+        )
         if len(request_id) > 256:
             raise MalformedData(SERVICE, "requestId is too long")
-        if require_str(payload.get("inputMint"), service=SERVICE, field="inputMint") != input_mint:
+        if (
+            require_str(payload.get("inputMint"), service=SERVICE, field="inputMint")
+            != input_mint
+        ):
             raise MalformedData(SERVICE, "quote input mint mismatch")
-        if require_str(payload.get("outputMint"), service=SERVICE, field="outputMint") != output_mint:
+        if (
+            require_str(payload.get("outputMint"), service=SERVICE, field="outputMint")
+            != output_mint
+        ):
             raise MalformedData(SERVICE, "quote output mint mismatch")
 
-        input_raw = to_decimal(payload.get("inAmount"), service=SERVICE, field="inAmount")
-        output_raw = to_decimal(payload.get("outAmount"), service=SERVICE, field="outAmount")
+        input_raw = to_decimal(
+            payload.get("inAmount"), service=SERVICE, field="inAmount"
+        )
+        output_raw = to_decimal(
+            payload.get("outAmount"), service=SERVICE, field="outAmount"
+        )
         if input_raw != Decimal(requested_amount) or output_raw <= 0:
-            raise MalformedData(SERVICE, "quote amounts are invalid or do not match request")
+            raise MalformedData(
+                SERVICE, "quote amounts are invalid or do not match request"
+            )
 
-        router = require_str(payload.get("router"), service=SERVICE, field="router").lower()
+        router = require_str(
+            payload.get("router"), service=SERVICE, field="router"
+        ).lower()
         if router not in ALLOWED_ROUTERS:
             raise MalformedData(SERVICE, "unsupported router")
         mode_value = payload.get("mode")
@@ -129,7 +154,11 @@ class JupiterQuoteV2Adapter:
             raise MalformedData(SERVICE, "unsupported order mode")
 
         fee_bps = payload.get("feeBps")
-        if isinstance(fee_bps, bool) or not isinstance(fee_bps, int) or not 0 <= fee_bps <= 10_000:
+        if (
+            isinstance(fee_bps, bool)
+            or not isinstance(fee_bps, int)
+            or not 0 <= fee_bps <= 10_000
+        ):
             raise MalformedData(SERVICE, "feeBps must be an integer within [0, 10000]")
         fee_mint = require_str(payload.get("feeMint"), service=SERVICE, field="feeMint")
         try:
@@ -143,7 +172,9 @@ class JupiterQuoteV2Adapter:
             if not isinstance(platform_payload, dict):
                 raise MalformedData(SERVICE, "platformFee must be an object")
             fee_amount = to_decimal(
-                platform_payload.get("amount"), service=SERVICE, field="platformFee.amount"
+                platform_payload.get("amount"),
+                service=SERVICE,
+                field="platformFee.amount",
             )
             platform_bps = platform_payload.get("feeBps")
             if (

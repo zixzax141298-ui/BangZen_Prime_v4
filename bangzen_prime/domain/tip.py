@@ -15,8 +15,13 @@ from bangzen_prime.domain.values import non_negative, positive
 from bangzen_prime.errors import DomainError
 
 
-def dynamic_tip_lamports(*, market_floor_lamports: object, expected_gain_lamports: object,
-                         cap_lamports: object, share_of_gain: object = Decimal("0.5")) -> Decimal:
+def dynamic_tip_lamports(
+    *,
+    market_floor_lamports: object,
+    expected_gain_lamports: object,
+    cap_lamports: object,
+    share_of_gain: object = Decimal("0.5"),
+) -> Decimal:
     floor = non_negative(market_floor_lamports, "market_floor_lamports")
     gain = non_negative(expected_gain_lamports, "expected_gain_lamports")
     cap = positive(cap_lamports, "cap_lamports")

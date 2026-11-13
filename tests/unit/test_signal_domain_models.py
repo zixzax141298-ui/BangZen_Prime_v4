@@ -43,8 +43,11 @@ class SignalAggregateTest(unittest.TestCase):
 
     def test_accept_creates_signal_event_and_validated_levels(self):
         signal = Signal.accept(
-            token_id=self.token_id, pair_id=self.pair_id, score=D("90"),
-            confidence=D("0.9"), levels=PriceLevels(D("2"), D("1.8"), D("2.4")),
+            token_id=self.token_id,
+            pair_id=self.pair_id,
+            score=D("90"),
+            confidence=D("0.9"),
+            levels=PriceLevels(D("2"), D("1.8"), D("2.4")),
             created_at=START,
         )
         self.assertEqual(signal.status, SignalStatus.ACCEPTED)
@@ -53,20 +56,30 @@ class SignalAggregateTest(unittest.TestCase):
 
     def test_reject_requires_reason_codes(self):
         signal = Signal.reject(
-            token_id=self.token_id, pair_id=self.pair_id, score=D("10"),
-            reasons=(RejectReason.LOW_LIQUIDITY,), created_at=START,
+            token_id=self.token_id,
+            pair_id=self.pair_id,
+            score=D("10"),
+            reasons=(RejectReason.LOW_LIQUIDITY,),
+            created_at=START,
         )
         self.assertEqual(signal.status, SignalStatus.REJECTED)
         with self.assertRaises(DomainError):
             Signal.reject(
-                token_id=self.token_id, pair_id=self.pair_id, score=D("10"),
-                reasons=(), created_at=START,
+                token_id=self.token_id,
+                pair_id=self.pair_id,
+                score=D("10"),
+                reasons=(),
+                created_at=START,
             )
 
     def test_watch_signal_is_not_execution_approval(self):
         signal = Signal(
-            token_id=self.token_id, pair_id=self.pair_id, status=SignalStatus.WATCH,
-            score=D("50"), reasons=(RejectReason.PHASE_WATCH_ONLY,), created_at=START,
+            token_id=self.token_id,
+            pair_id=self.pair_id,
+            status=SignalStatus.WATCH,
+            score=D("50"),
+            reasons=(RejectReason.PHASE_WATCH_ONLY,),
+            created_at=START,
         )
         self.assertEqual(signal.status, SignalStatus.WATCH)
         self.assertIsNone(signal.levels)
@@ -75,8 +88,12 @@ class SignalAggregateTest(unittest.TestCase):
     def test_accepted_signal_requires_levels_confidence_and_no_reasons(self):
         with self.assertRaises(DomainError):
             Signal(
-                token_id=self.token_id, pair_id=self.pair_id, status=SignalStatus.ACCEPTED,
-                score=D("90"), reasons=(), created_at=START,
+                token_id=self.token_id,
+                pair_id=self.pair_id,
+                status=SignalStatus.ACCEPTED,
+                score=D("90"),
+                reasons=(),
+                created_at=START,
             )
 
 

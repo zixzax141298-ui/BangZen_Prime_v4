@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
 import json
 import os
 import tempfile
 import unittest
+from datetime import UTC, datetime
 
 from bangzen_prime.application.ai_manager_contract import EvidencePackage
 from bangzen_prime.application.lifecycle_weapon_router import (
@@ -14,8 +14,7 @@ from bangzen_prime.application.lifecycle_weapon_router import (
 )
 from bangzen_prime.errors import ConfigurationError
 
-
-NOW = datetime(2026, 11, 13, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
 SUBJECT = "So11111111111111111111111111111111111111112"
 
 
@@ -39,17 +38,22 @@ def record(evidence_id, evidence_type, **overrides):
 
 
 def package(*records):
-    return EvidencePackage.from_mapping({
-        "schema_version": "1.0",
-        "subject": SUBJECT,
-        "collected_at": "2026-11-13T11:59:30Z",
-        "evidence": list(records),
-    })
+    return EvidencePackage.from_mapping(
+        {
+            "schema_version": "1.0",
+            "subject": SUBJECT,
+            "collected_at": "2026-11-13T11:59:30Z",
+            "evidence": list(records),
+        }
+    )
 
 
 def default_selector():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "config",
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "config",
         "lifecycle_weapon_policy.json",
     )
     return LifecycleWeaponSelector(load_policy(path))
@@ -116,7 +120,9 @@ class LifecycleWeaponSelectionTests(unittest.TestCase):
         cases = (
             record("old", "launch_transactions", observed_at="2026-11-13T10:00:00Z"),
             record("partial", "launch_transactions", validation_status="PARTIAL"),
-            record("unavailable", "launch_transactions", validation_status="UNAVAILABLE"),
+            record(
+                "unavailable", "launch_transactions", validation_status="UNAVAILABLE"
+            ),
         )
         for item in cases:
             evidence = package(
@@ -145,20 +151,38 @@ class LifecycleWeaponSelectionTests(unittest.TestCase):
         self.assertEqual(plan.reason_code, "UNKNOWN_OR_UNVERIFIED_PHASE")
 
     def test_execution_weapon_is_rejected_by_policy(self):
-        with open(os.path.join(os.path.dirname(__file__), "..", "..", "config",
-                               "lifecycle_weapon_policy.json"), encoding="utf-8") as fh:
+        with open(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "config",
+                "lifecycle_weapon_policy.json",
+            ),
+            encoding="utf-8",
+        ) as fh:
             raw = json.load(fh)
-        raw["phases"]["GROWTH"].append({
-            "weapon_id": "jito_adapter",
-            "required_evidence": ["wallet_flow"],
-            "priority": 1000,
-        })
+        raw["phases"]["GROWTH"].append(
+            {
+                "weapon_id": "jito_adapter",
+                "required_evidence": ["wallet_flow"],
+                "priority": 1000,
+            }
+        )
         with self.assertRaises(ConfigurationError):
             policy_from_mapping(raw)
 
     def test_policy_cannot_select_multiple_or_omit_phase(self):
-        with open(os.path.join(os.path.dirname(__file__), "..", "..", "config",
-                               "lifecycle_weapon_policy.json"), encoding="utf-8") as fh:
+        with open(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "config",
+                "lifecycle_weapon_policy.json",
+            ),
+            encoding="utf-8",
+        ) as fh:
             raw = json.load(fh)
         raw["max_selected_weapons"] = 2
         with self.assertRaises(ConfigurationError):
@@ -169,8 +193,16 @@ class LifecycleWeaponSelectionTests(unittest.TestCase):
             policy_from_mapping(raw)
 
     def test_policy_rejects_boolean_and_float_weapon_limits(self):
-        with open(os.path.join(os.path.dirname(__file__), "..", "..", "config",
-                               "lifecycle_weapon_policy.json"), encoding="utf-8") as fh:
+        with open(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "config",
+                "lifecycle_weapon_policy.json",
+            ),
+            encoding="utf-8",
+        ) as fh:
             raw = json.load(fh)
         for invalid in (True, 1.0, 0, 2):
             raw["max_selected_weapons"] = invalid

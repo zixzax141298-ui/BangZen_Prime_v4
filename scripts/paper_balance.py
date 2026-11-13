@@ -18,9 +18,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from bangzen_prime.application.paper_trading import PaperPortfolio  # noqa: E402
-from bangzen_prime.infrastructure.persistence.sqlite.database import Database  # noqa: E402
-from bangzen_prime.settings import Settings  # noqa: E402
+from bangzen_prime.application.paper_trading import PaperPortfolio
+from bangzen_prime.infrastructure.persistence.sqlite.database import Database
+from bangzen_prime.settings import Settings
 
 
 def _decimal(text: str) -> Decimal:
@@ -29,15 +29,25 @@ def _decimal(text: str) -> Decimal:
     except InvalidOperation as exc:
         raise argparse.ArgumentTypeError(f"not a number: {text!r}") from exc
     if not value.is_finite() or value <= 0:
-        raise argparse.ArgumentTypeError("starting equity must be a positive finite number")
+        raise argparse.ArgumentTypeError(
+            "starting equity must be a positive finite number"
+        )
     return value
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Paper trading balance and PnL (read-only)")
-    parser.add_argument("--db", default=None, help="SQLite database path (default: settings db_path)")
-    parser.add_argument("--starting-equity", type=_decimal, default=None,
-                        help="Starting paper equity (default: settings starting_equity)")
+    parser = argparse.ArgumentParser(
+        description="Paper trading balance and PnL (read-only)"
+    )
+    parser.add_argument(
+        "--db", default=None, help="SQLite database path (default: settings db_path)"
+    )
+    parser.add_argument(
+        "--starting-equity",
+        type=_decimal,
+        default=None,
+        help="Starting paper equity (default: settings starting_equity)",
+    )
     args = parser.parse_args(argv)
 
     settings = Settings()
@@ -62,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
 
     equity = snap.equity_quote
     peak = snap.peak_equity_quote
-    drawdown = (peak - equity) / peak * Decimal("100") if peak > 0 else Decimal("0")
+    drawdown = (peak - equity) / peak * Decimal(100) if peak > 0 else Decimal(0)
 
     print("PAPER TRADING (simulasi, bukan uang sungguhan)")
     print(f"Modal awal        : {starting}")

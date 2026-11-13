@@ -83,7 +83,7 @@ class SimulationResult:
 class RpcPort(Protocol):
     def simulate(self, plan: PlannedTransaction) -> SimulationResult: ...
 
-    def send(self, signed: "SignedTransaction") -> str:
+    def send(self, signed: SignedTransaction) -> str:
         """Broadcast and return a signature. Only reachable through an approved signer."""
         ...
 

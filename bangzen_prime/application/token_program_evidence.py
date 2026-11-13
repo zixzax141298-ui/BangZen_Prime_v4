@@ -8,8 +8,8 @@ from typing import Protocol
 
 from bangzen_prime.domain.shared import ensure_utc
 from bangzen_prime.domain.token_2022_extension_evidence import (
-    Token2022ExtensionEvidence,
     UNAVAILABLE,
+    Token2022ExtensionEvidence,
 )
 from bangzen_prime.domain.token_2022_extensions import REJECTED
 from bangzen_prime.domain.token_2022_risk import (
@@ -79,15 +79,21 @@ class TokenProgramEvidenceUseCase:
             )
         if evidence.mint != mint:
             return TokenProgramAssessment(
-                mint, evidence.token_program, BLOCKED,
-                ("TOKEN2022_MINT_MISMATCH",), evidence,
+                mint,
+                evidence.token_program,
+                BLOCKED,
+                ("TOKEN2022_MINT_MISMATCH",),
+                evidence,
             )
 
         age = ensure_utc(now) - ensure_utc(evidence.observed_at)
         if age < timedelta(0) or age > max_age:
             return TokenProgramAssessment(
-                mint, evidence.token_program, HOLD,
-                ("TOKEN_PROGRAM_EVIDENCE_STALE",), evidence,
+                mint,
+                evidence.token_program,
+                HOLD,
+                ("TOKEN_PROGRAM_EVIDENCE_STALE",),
+                evidence,
             )
 
         # The Helius extension reader reports a non-Token-2022 owner as REJECTED.
@@ -99,25 +105,37 @@ class TokenProgramEvidenceUseCase:
             and "CLASSIC_SPL_MINT_CONFIRMED" in evidence.reason_codes
         ):
             return TokenProgramAssessment(
-                mint, TOKEN_PROGRAM_ID, "NOT_APPLICABLE",
-                ("CLASSIC_SPL_TOKEN_PROGRAM",), evidence,
+                mint,
+                TOKEN_PROGRAM_ID,
+                "NOT_APPLICABLE",
+                ("CLASSIC_SPL_TOKEN_PROGRAM",),
+                evidence,
             )
 
         if evidence.token_program != TOKEN_2022_PROGRAM_ID:
             if evidence.validation_status == UNAVAILABLE:
                 return TokenProgramAssessment(
-                    mint, evidence.token_program, HOLD,
-                    ("TOKEN_PROGRAM_EVIDENCE_UNAVAILABLE",), evidence,
+                    mint,
+                    evidence.token_program,
+                    HOLD,
+                    ("TOKEN_PROGRAM_EVIDENCE_UNAVAILABLE",),
+                    evidence,
                 )
             return TokenProgramAssessment(
-                mint, evidence.token_program, BLOCKED,
-                ("TOKEN_PROGRAM_UNSUPPORTED",), evidence,
+                mint,
+                evidence.token_program,
+                BLOCKED,
+                ("TOKEN_PROGRAM_UNSUPPORTED",),
+                evidence,
             )
 
         decision = evaluate_token_2022_risk(
             evidence, expected_mint=mint, now=now, max_age=max_age
         )
         return TokenProgramAssessment(
-            mint, TOKEN_2022_PROGRAM_ID, decision.status,
-            decision.reason_codes, evidence,
+            mint,
+            TOKEN_2022_PROGRAM_ID,
+            decision.status,
+            decision.reason_codes,
+            evidence,
         )

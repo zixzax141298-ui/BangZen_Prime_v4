@@ -79,7 +79,9 @@ class Monitor:
 
     def _spend(self) -> None:
         for provider in SCAN_PROVIDERS:
-            if not self.budget.try_acquire(provider):  # pragma: no cover - guarded by _can_scan
+            if not self.budget.try_acquire(
+                provider
+            ):  # pragma: no cover - guarded by _can_scan
                 raise ConfigurationError(f"budget exhausted for {provider}")
 
     def run_cycle(self) -> CycleReport:
@@ -98,12 +100,16 @@ class Monitor:
             previous = self._last_phase.get(mint)
             if previous is not None and previous != result.phase:
                 transitions.append(Transition(mint, previous, result.phase))
-                logger.info("phase transition %s: %s -> %s", mint, previous, result.phase)
+                logger.info(
+                    "phase transition %s: %s -> %s", mint, previous, result.phase
+                )
             self._last_phase[mint] = result.phase
         self.worker.run_once()
         return CycleReport(self._cycle, scanned, skipped, accepted, tuple(transitions))
 
-    def run(self, *, cycles: int, interval_seconds: float, sleep: Callable[[float], None]) -> list[CycleReport]:
+    def run(
+        self, *, cycles: int, interval_seconds: float, sleep: Callable[[float], None]
+    ) -> list[CycleReport]:
         """cycles == 0 means run until interrupted by the operator."""
         reports: list[CycleReport] = []
         n = 0

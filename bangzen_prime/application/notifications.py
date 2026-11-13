@@ -1,10 +1,11 @@
 """Notification handler: formats accepted signals and delivers via the Notifier port."""
 
 from __future__ import annotations
+
 from decimal import Decimal, InvalidOperation
 
-from bangzen_prime.application.ports import Notifier
 from bangzen_prime.application.mode_controller import ModeController
+from bangzen_prime.application.ports import Notifier
 from bangzen_prime.domain.shared import DomainEvent
 
 SIGNAL_EVENT = "SignalGenerated"
@@ -18,8 +19,8 @@ def _fmt_price(value) -> str:
         if d == 0:
             return "0"
         if abs(d) < Decimal("0.001"):
-            return f"{d:.8f}".rstrip('0').rstrip('.')
-        return f"{d:.4f}".rstrip('0').rstrip('.')
+            return f"{d:.8f}".rstrip("0").rstrip(".")
+        return f"{d:.4f}".rstrip("0").rstrip(".")
     except (InvalidOperation, ValueError):
         return str(value)
 
@@ -39,29 +40,34 @@ def format_signal_text(event: DomainEvent) -> str:
         f"Signal: {p.get('signal_id', 'UNAVAILABLE')}",
     ]
     if p.get("mint") and p.get("chain") and p.get("symbol"):
-        lines.extend([
-            f"Asset: {p['symbol']} ({p['chain']})",
-            f"Mint: {p['mint']}",
-            f"Pair: {p.get('pair_address', 'UNAVAILABLE')}",
-            f"DEX: {p.get('dex_id', 'UNAVAILABLE')}",
-            f"Market source: {p.get('market_source', 'UNAVAILABLE')}",
-            f"Observed at: {p.get('market_observed_at', 'UNAVAILABLE')}",
-        ])
+        lines.extend(
+            [
+                f"Asset: {p['symbol']} ({p['chain']})",
+                f"Mint: {p['mint']}",
+                f"Pair: {p.get('pair_address', 'UNAVAILABLE')}",
+                f"DEX: {p.get('dex_id', 'UNAVAILABLE')}",
+                f"Market source: {p.get('market_source', 'UNAVAILABLE')}",
+                f"Observed at: {p.get('market_observed_at', 'UNAVAILABLE')}",
+            ]
+        )
     else:
         lines.append(f"Token id: {p.get('token_id', 'UNAVAILABLE')} (mint unavailable)")
-    lines.extend([
-        f"Entry reference: {_fmt_price(p.get('entry', 'UNAVAILABLE'))}",
-        f"Stop reference: {_fmt_price(p.get('stop_loss', 'UNAVAILABLE'))}",
-        f"Target reference: {_fmt_price(p.get('take_profit', 'UNAVAILABLE'))}",
-        f"Heuristic score: {_fmt_pct(p.get('score', 'UNAVAILABLE'))}",
-        f"Heuristic confidence: {_fmt_pct(p.get('confidence', 'UNAVAILABLE'))}",
-    ])
+    lines.extend(
+        [
+            f"Entry reference: {_fmt_price(p.get('entry', 'UNAVAILABLE'))}",
+            f"Stop reference: {_fmt_price(p.get('stop_loss', 'UNAVAILABLE'))}",
+            f"Target reference: {_fmt_price(p.get('take_profit', 'UNAVAILABLE'))}",
+            f"Heuristic score: {_fmt_pct(p.get('score', 'UNAVAILABLE'))}",
+            f"Heuristic confidence: {_fmt_pct(p.get('confidence', 'UNAVAILABLE'))}",
+        ]
+    )
     return "\n".join(lines)
 
 
 def make_notification_handler(notifier: Notifier):
     def handle(event: DomainEvent) -> None:
         notifier.send(format_signal_text(event))  # raises on failure, so it is retried
+
     return handle
 
 

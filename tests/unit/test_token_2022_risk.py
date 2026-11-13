@@ -1,11 +1,19 @@
 import unittest
 from datetime import timedelta
 
-from bangzen_prime.domain.token_2022_extension_config import ParsedToken2022Configuration
-from bangzen_prime.domain.token_2022_extension_evidence import Token2022ExtensionEvidence
-from bangzen_prime.domain.token_2022_extensions import VERIFIED, PARTIAL, REJECTED
-from bangzen_prime.domain.token_2022_risk import APPROVED, BLOCKED, HOLD, evaluate_token_2022_risk
-from bangzen_prime.errors import DomainError
+from bangzen_prime.domain.token_2022_extension_config import (
+    ParsedToken2022Configuration,
+)
+from bangzen_prime.domain.token_2022_extension_evidence import (
+    Token2022ExtensionEvidence,
+)
+from bangzen_prime.domain.token_2022_extensions import PARTIAL, REJECTED, VERIFIED
+from bangzen_prime.domain.token_2022_risk import (
+    APPROVED,
+    BLOCKED,
+    HOLD,
+    evaluate_token_2022_risk,
+)
 from bangzen_prime.errors import DomainError
 from tests.support import START, TOKEN_MINT
 
@@ -16,8 +24,14 @@ def evidence(*, status=VERIFIED, flags=(), config_status=VERIFIED, mint=TOKEN_MI
         status = config_status
     config = ParsedToken2022Configuration(config_status, (), (), tuple(flags), ())
     return Token2022ExtensionEvidence(
-        mint=mint, validation_status=status, observed_at=START, source="helius",
-        source_record_id="mint:slot", slot=10, risk_flags=tuple(flags), configuration=config,
+        mint=mint,
+        validation_status=status,
+        observed_at=START,
+        source="helius",
+        source_record_id="mint:slot",
+        slot=10,
+        risk_flags=tuple(flags),
+        configuration=config,
     )
 
 
@@ -40,23 +54,37 @@ class Token2022RiskDecisionTests(unittest.TestCase):
         self.assertEqual(self.evaluate(evidence(status=REJECTED)).status, BLOCKED)
 
     def test_mint_mismatch_blocks(self):
-        result = self.evaluate(evidence(mint="So11111111111111111111111111111111111111112"))
+        result = self.evaluate(
+            evidence(mint="So11111111111111111111111111111111111111112")
+        )
         self.assertIn("TOKEN2022_MINT_MISMATCH", result.reason_codes)
 
     def test_stale_or_future_evidence_holds(self):
-        self.assertEqual(self.evaluate(evidence(), now=START + timedelta(seconds=61)).status, HOLD)
-        self.assertEqual(self.evaluate(evidence(), now=START - timedelta(seconds=1)).status, HOLD)
+        self.assertEqual(
+            self.evaluate(evidence(), now=START + timedelta(seconds=61)).status, HOLD
+        )
+        self.assertEqual(
+            self.evaluate(evidence(), now=START - timedelta(seconds=1)).status, HOLD
+        )
 
     def test_paused_nontransferable_and_frozen_states_veto(self):
-        for flag in ("TOKEN_TRANSFERS_PAUSED", "NON_TRANSFERABLE",
-                     "DEFAULT_ACCOUNTS_FROZEN", "DEFAULT_ACCOUNTS_UNINITIALIZED"):
+        for flag in (
+            "TOKEN_TRANSFERS_PAUSED",
+            "NON_TRANSFERABLE",
+            "DEFAULT_ACCOUNTS_FROZEN",
+            "DEFAULT_ACCOUNTS_UNINITIALIZED",
+        ):
             with self.subTest(flag=flag):
                 result = self.evaluate(evidence(flags=(flag,)))
                 self.assertEqual(result.status, BLOCKED)
                 self.assertIn(flag, result.reason_codes)
 
     def test_delegate_hook_and_fee_require_review_not_automatic_ban(self):
-        for flag in ("PERMANENT_DELEGATE_ACTIVE", "TRANSFER_HOOK_PROGRAM_CONFIGURED", "TRANSFER_FEE_NONZERO"):
+        for flag in (
+            "PERMANENT_DELEGATE_ACTIVE",
+            "TRANSFER_HOOK_PROGRAM_CONFIGURED",
+            "TRANSFER_FEE_NONZERO",
+        ):
             with self.subTest(flag=flag):
                 result = self.evaluate(evidence(flags=(flag,)))
                 self.assertEqual(result.status, HOLD)

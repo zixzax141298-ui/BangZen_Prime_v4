@@ -8,55 +8,102 @@ from decimal import Decimal
 
 from bangzen_prime.application.ai_brain import AIBrain
 from bangzen_prime.bootstrap import build_container
-from bangzen_prime.infrastructure.adapters.chain.helius_token_2022_extensions import HeliusToken2022ExtensionReader
+from bangzen_prime.domain.token_2022_extension_config import (
+    ParsedToken2022Configuration,
+)
+from bangzen_prime.domain.token_2022_extension_evidence import (
+    Token2022ExtensionEvidence,
+)
+from bangzen_prime.domain.token_2022_extensions import REJECTED, VERIFIED
+from bangzen_prime.domain.token_programs import TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID
 from bangzen_prime.errors import ConfigurationError
+from bangzen_prime.infrastructure.adapters.chain.helius_token_2022_extensions import (
+    HeliusToken2022ExtensionReader,
+)
 from bangzen_prime.infrastructure.http import HttpResponse, TransportTimeout
 from bangzen_prime.infrastructure.persistence.sqlite.outbox import AuditLog
 from bangzen_prime.settings import Settings
-from bangzen_prime.domain.token_2022_extension_config import ParsedToken2022Configuration
-from bangzen_prime.domain.token_2022_extension_evidence import Token2022ExtensionEvidence
-from bangzen_prime.domain.token_2022_extensions import REJECTED, VERIFIED
-from bangzen_prime.domain.token_programs import TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID
 from tests.support import (
-    TOKEN_MINT, RecordingNotifier, RecordingTransport, clock_at,
-    json_response, pair_payload, safety_payload, START
+    START,
+    TOKEN_MINT,
+    RecordingNotifier,
+    RecordingTransport,
+    clock_at,
+    json_response,
+    pair_payload,
+    safety_payload,
 )
 
 DEX = "https://api.dexscreener.com"
 RC = "https://api.rugcheck.xyz/v1"
 
+
 class FakeAIProvider:
     name = "test"
-    def __init__(self): self.calls = 0
+
+    def __init__(self):
+        self.calls = 0
+
     def complete(self, system, user):
         self.calls += 1
-        return json.dumps({"decision": "BUY", "confidence": 0.95, "reason": "holder evidence and market checks passed"})
+        return json.dumps(
+            {
+                "decision": "BUY",
+                "confidence": 0.95,
+                "reason": "holder evidence and market checks passed",
+            }
+        )
+
 
 class FailingAIProvider:
     name = "test"
-    def complete(self, system, user): raise RuntimeError("synthetic provider outage")
+
+    def complete(self, system, user):
+        raise RuntimeError("synthetic provider outage")
+
 
 PAIR_CREATED_MS = 1_700_000_000_000
+
 
 class FakeIntel:
     async def analyze_token(self, mint):
         from types import SimpleNamespace
-        return SimpleNamespace(is_bundled=False, has_mev=False, score=Decimal("90"))
+
+        return SimpleNamespace(is_bundled=False, has_mev=False, score=Decimal(90))
+
 
 class FakeHolderData:
     TOP_HOLDERS = tuple(f"HolderAddr{i}{'1'*40}" for i in range(1, 6))
+
     def holder_profile(self, chain, mint):
         from types import SimpleNamespace
-        return SimpleNamespace(mint=mint, holder_count=500, top_holder_share_pct=Decimal("18.5"), source="solana_tracker", top_holders=self.TOP_HOLDERS)
+
+        return SimpleNamespace(
+            mint=mint,
+            holder_count=500,
+            top_holder_share_pct=Decimal("18.5"),
+            source="solana_tracker",
+            top_holders=self.TOP_HOLDERS,
+        )
+
 
 class ClassicTokenProgramReader:
-    def __init__(self, clock): self.clock = clock
+    def __init__(self, clock):
+        self.clock = clock
+
     def read(self, mint):
         return Token2022ExtensionEvidence(
-            mint=mint, validation_status=REJECTED, observed_at=self.clock.now(),
-            source="test", source_record_id="classic-owner", slot=1,
-            token_program=TOKEN_PROGRAM_ID, account_data_length=82, reason_codes=("CLASSIC_SPL_MINT_CONFIRMED",)
+            mint=mint,
+            validation_status=REJECTED,
+            observed_at=self.clock.now(),
+            source="test",
+            source_record_id="classic-owner",
+            slot=1,
+            token_program=TOKEN_PROGRAM_ID,
+            account_data_length=82,
+            reason_codes=("CLASSIC_SPL_MINT_CONFIRMED",),
         )
+
 
 class World:
     def __init__(self):
@@ -67,39 +114,69 @@ class World:
 
     def handler(self, url):
         if url.startswith(DEX):
-            if self.pairs_mode == "timeout": return TransportTimeout()
-            if self.pairs_mode == "empty": return json_response([])
-            if self.pairs_mode == "malformed": return json_response({"unexpected": True})
+            if self.pairs_mode == "timeout":
+                return TransportTimeout()
+            if self.pairs_mode == "empty":
+                return json_response([])
+            if self.pairs_mode == "malformed":
+                return json_response({"unexpected": True})
             price = f"{self.price_seq[self.step]:.6f}"
             self.step += 1
-            return json_response([pair_payload(price=price, liquidity=200000.0, volume=300000.0, created_ms=PAIR_CREATED_MS)])
+            return json_response(
+                [
+                    pair_payload(
+                        price=price,
+                        liquidity=200000.0,
+                        volume=300000.0,
+                        created_ms=PAIR_CREATED_MS,
+                    )
+                ]
+            )
         if url.startswith(RC):
-            if self.safety_mode == "outage": return HttpResponse(503, b"", {})
-            if self.safety_mode == "rugged": return json_response(safety_payload(score=95, rugged=True))
-            if self.safety_mode == "risky": return json_response(safety_payload(score=85))
+            if self.safety_mode == "outage":
+                return HttpResponse(503, b"", {})
+            if self.safety_mode == "rugged":
+                return json_response(safety_payload(score=95, rugged=True))
+            if self.safety_mode == "risky":
+                return json_response(safety_payload(score=85))
             return json_response(safety_payload(score=10))
         raise AssertionError(f"unexpected URL: {url}")
 
-def build(world=None, notifier=None, settings=None, evidence=True, token_2022_reader=None):
+
+def build(
+    world=None, notifier=None, settings=None, evidence=True, token_2022_reader=None
+):
     world = world or World()
     transport = RecordingTransport(world.handler)
     clock = clock_at(0)
-    
+
     reader = token_2022_reader or ClassicTokenProgramReader(clock)
-    if hasattr(reader, 'clock'): reader.clock = clock 
-    
-    container = build_container(settings or Settings(), transport=transport, clock=clock,
-                                sleep=lambda s: None, notifier=notifier, db_path=":memory:", token_2022_reader=reader)
+    if hasattr(reader, "clock"):
+        reader.clock = clock
+
+    container = build_container(
+        settings or Settings(),
+        transport=transport,
+        clock=clock,
+        sleep=lambda s: None,
+        notifier=notifier,
+        db_path=":memory:",
+        token_2022_reader=reader,
+    )
+
     class ClearSybil:
         async def check_sybil_cluster(self, mint, top_holders):
             from types import SimpleNamespace
+
             return SimpleNamespace(available=True, is_bundled=False)
+
     container.scan.sybil_checker = ClearSybil()
     if evidence:
         container.scan.ai_brain = AIBrain(FakeAIProvider(), threshold=Decimal("0.8"))
         container.scan.holder_data = FakeHolderData()
         container.scan.intel_adapter = FakeIntel()
     return container, world, transport, clock
+
 
 class Token2022Reader:
     def __init__(self, flags=(), status=VERIFIED, config_status=VERIFIED, fail=False):
@@ -112,26 +189,47 @@ class Token2022Reader:
 
     def read(self, mint):
         self.calls.append(mint)
-        if self.fail: raise RuntimeError("synthetic Helius outage")
-        config = ParsedToken2022Configuration(self.config_status, (), (), self.flags, ())
-        return Token2022ExtensionEvidence(
-            mint=mint, validation_status=self.status, observed_at=self.clock.now() if self.clock else START,
-            source="helius", source_record_id="test-slot", slot=10, token_program=TOKEN_2022_PROGRAM_ID,
-            risk_flags=self.flags, configuration=config
+        if self.fail:
+            raise RuntimeError("synthetic Helius outage")
+        config = ParsedToken2022Configuration(
+            self.config_status, (), (), self.flags, ()
         )
+        return Token2022ExtensionEvidence(
+            mint=mint,
+            validation_status=self.status,
+            observed_at=self.clock.now() if self.clock else START,
+            source="helius",
+            source_record_id="test-slot",
+            slot=10,
+            token_program=TOKEN_2022_PROGRAM_ID,
+            risk_flags=self.flags,
+            configuration=config,
+        )
+
 
 class TokenProgramBootstrapTests(unittest.TestCase):
     def test_configured_helius_key_wires_read_only_token2022_reader(self):
-        container = build_container(Settings(helius_api_key="test-helius-key"), transport=RecordingTransport(lambda _url: json_response({})), clock=clock_at(0), db_path=":memory:")
-        try: self.assertIsInstance(container.token_program_evidence._reader, HeliusToken2022ExtensionReader)
-        finally: container.db.close()
+        container = build_container(
+            Settings(helius_api_key="test-helius-key"),
+            transport=RecordingTransport(lambda _url: json_response({})),
+            clock=clock_at(0),
+            db_path=":memory:",
+        )
+        try:
+            self.assertIsInstance(
+                container.token_program_evidence._reader, HeliusToken2022ExtensionReader
+            )
+        finally:
+            container.db.close()
+
 
 class ScanToSignalFlowTest(unittest.TestCase):
     def scan_n(self, c, n, clock=None):
         results = []
         for _ in range(n):
             results.extend(c.scan.execute("solana", [TOKEN_MINT]))
-            if clock is not None: clock.advance(91)
+            if clock is not None:
+                clock.advance(91)
         return results
 
     def test_token2022_paused_transfers_are_vetoed_before_signal_scoring(self):
@@ -174,7 +272,12 @@ class ScanToSignalFlowTest(unittest.TestCase):
         results = self.scan_n(c, 20, clock)
         accepted = [r for r in results if r.status == "ACCEPTED"]
         self.assertTrue(accepted, [r.reasons for r in results][-3:])
-        self.assertEqual(c.db.query_one("SELECT COUNT(*) AS n FROM outbox WHERE status='PENDING'")["n"], len(accepted))
+        self.assertEqual(
+            c.db.query_one("SELECT COUNT(*) AS n FROM outbox WHERE status='PENDING'")[
+                "n"
+            ],
+            len(accepted),
+        )
         stats = c.worker.run_once()
         self.assertEqual(stats.sent, len(accepted))
 
@@ -182,7 +285,9 @@ class ScanToSignalFlowTest(unittest.TestCase):
         c, _, _, clock = build()
         self.scan_n(c, 20, clock)
         for row in c.db.query_all("SELECT * FROM signals WHERE status = 'ACCEPTED'"):
-            entry, stop, target = (Decimal(row[k]) for k in ("entry_price", "stop_loss", "take_profit"))
+            entry, stop, target = (
+                Decimal(row[k]) for k in ("entry_price", "stop_loss", "take_profit")
+            )
             self.assertTrue(stop < entry < target)
 
     def test_notifier_failure_keeps_event_pending_then_delivers_on_retry(self):
@@ -204,7 +309,9 @@ class ScanToSignalFlowTest(unittest.TestCase):
         for _ in range(6):
             c.worker.run_once()
             clock.advance(3600)
-        failed = c.db.query_one("SELECT COUNT(*) AS n FROM outbox WHERE status = 'FAILED'")["n"]
+        failed = c.db.query_one(
+            "SELECT COUNT(*) AS n FROM outbox WHERE status = 'FAILED'"
+        )["n"]
         self.assertGreaterEqual(failed, 1)
 
     def test_audit_chain_intact_after_full_flow(self):
@@ -213,6 +320,7 @@ class ScanToSignalFlowTest(unittest.TestCase):
         c.worker.run_once()
         with c.db.transaction() as conn:
             self.assertIsNone(AuditLog(conn).verify())
+
 
 class SafetyAndMarketGatesTest(unittest.TestCase):
     def test_rugged_token_rejected_before_any_scoring_or_price_storage(self):
@@ -226,8 +334,10 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
     def test_risk_above_threshold_rejected(self):
         world = World()
         world.safety_mode = "risky"
-        c, _, _, _ = build(world=world, settings=Settings(max_risk_score=Decimal("60")))
-        self.assertEqual(c.scan.execute("solana", [TOKEN_MINT])[0].reasons, ("RISK_TOO_HIGH",))
+        c, _, _, _ = build(world=world, settings=Settings(max_risk_score=Decimal(60)))
+        self.assertEqual(
+            c.scan.execute("solana", [TOKEN_MINT])[0].reasons, ("RISK_TOO_HIGH",)
+        )
 
     def test_safety_outage_remains_watchable_with_reason(self):
         world = World()
@@ -236,7 +346,7 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
         for _ in range(5):
             clock.advance(91)
             c.scan.execute("solana", [TOKEN_MINT])
-        clock.advance(91) # Mencegah DUPLICATE_CANDIDATE
+        clock.advance(91)  # Mencegah DUPLICATE_CANDIDATE
         result = c.scan.execute("solana", [TOKEN_MINT])[0]
         self.assertEqual(result.reasons, ("SAFETY_UNAVAILABLE",))
         self.assertEqual(result.status, "WATCH")
@@ -246,7 +356,7 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
         for _ in range(5):
             clock.advance(91)
             c.scan.execute("solana", [TOKEN_MINT])
-        clock.advance(91) # Mencegah DUPLICATE_CANDIDATE
+        clock.advance(91)  # Mencegah DUPLICATE_CANDIDATE
         c.scan.intel_adapter = object()
         result = c.scan.execute("solana", [TOKEN_MINT])[0]
         self.assertEqual(result.status, "WATCH")
@@ -268,7 +378,7 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
         for _ in range(5):
             clock.advance(91)
             c.scan.execute("solana", [TOKEN_MINT])
-        clock.advance(91) # Mencegah DUPLICATE_CANDIDATE
+        clock.advance(91)  # Mencegah DUPLICATE_CANDIDATE
         c.scan.ai_brain = AIBrain(FailingAIProvider(), threshold=Decimal("0.8"))
         c.scan.holder_data = FakeHolderData()
         result = c.scan.execute("solana", [TOKEN_MINT])[0]
@@ -288,7 +398,9 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
         class UnknownSybil:
             async def check_sybil_cluster(self, mint, top_holders):
                 from types import SimpleNamespace
+
                 return SimpleNamespace(available=False, is_bundled=None)
+
         c, _, _, _ = build()
         c.scan.sybil_checker = UnknownSybil()
         result = c.scan.execute("solana", [TOKEN_MINT])[0]
@@ -299,7 +411,9 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
         class ClusterSybil:
             async def check_sybil_cluster(self, mint, top_holders):
                 from types import SimpleNamespace
+
                 return SimpleNamespace(available=True, is_bundled=True)
+
         c, _, _, _ = build()
         provider = FakeAIProvider()
         c.scan.ai_brain = AIBrain(provider, threshold=Decimal("0.8"))
@@ -312,7 +426,9 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
         class MalformedSybil:
             async def check_sybil_cluster(self, mint, top_holders):
                 from types import SimpleNamespace
+
                 return SimpleNamespace(available=True, is_bundled=0)
+
         c, _, _, _ = build()
         c.scan.sybil_checker = MalformedSybil()
         result = c.scan.execute("solana", [TOKEN_MINT])[0]
@@ -323,7 +439,15 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
         class HolderWithoutAddresses:
             def holder_profile(self, chain, mint):
                 from types import SimpleNamespace
-                return SimpleNamespace(mint=mint, holder_count=500, top_holder_share_pct=Decimal("18.5"), source="solana_tracker", top_holders=())
+
+                return SimpleNamespace(
+                    mint=mint,
+                    holder_count=500,
+                    top_holder_share_pct=Decimal("18.5"),
+                    source="solana_tracker",
+                    top_holders=(),
+                )
+
         c, _, _, _ = build()
         c.scan.holder_data = HolderWithoutAddresses()
         result = c.scan.execute("solana", [TOKEN_MINT])[0]
@@ -334,12 +458,19 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
         class WrongMintHolder:
             def holder_profile(self, chain, mint):
                 from types import SimpleNamespace
-                return SimpleNamespace(mint="WrongMint1111111111111111111111111111111", holder_count=500, top_holder_share_pct=Decimal("18.5"), source="solana_tracker")
+
+                return SimpleNamespace(
+                    mint="WrongMint1111111111111111111111111111111",
+                    holder_count=500,
+                    top_holder_share_pct=Decimal("18.5"),
+                    source="solana_tracker",
+                )
+
         c, _, _, clock = build()
         for _ in range(5):
             clock.advance(91)
             c.scan.execute("solana", [TOKEN_MINT])
-        clock.advance(91) # Mencegah DUPLICATE_CANDIDATE
+        clock.advance(91)  # Mencegah DUPLICATE_CANDIDATE
         provider = FakeAIProvider()
         c.scan.ai_brain = AIBrain(provider, threshold=Decimal("0.8"))
         c.scan.holder_data = WrongMintHolder()
@@ -372,32 +503,50 @@ class SafetyAndMarketGatesTest(unittest.TestCase):
         for _ in range(5):
             clock.advance(91)
             c.scan.execute("solana", [TOKEN_MINT])
-        clock.advance(91) # Mencegah DUPLICATE_CANDIDATE
+        clock.advance(91)  # Mencegah DUPLICATE_CANDIDATE
         original = c.scan._market.fetch_pairs
+
         def stale_fetch(chain, mint):
             pairs = original(chain, mint)
             clock.advance(999)
             return pairs
+
         c.scan._market.fetch_pairs = stale_fetch
-        self.assertEqual(c.scan.execute("solana", [TOKEN_MINT])[0].reasons, ("TOKEN2022_EVIDENCE_STALE",))
+        self.assertEqual(
+            c.scan.execute("solana", [TOKEN_MINT])[0].reasons,
+            ("TOKEN2022_EVIDENCE_STALE",),
+        )
 
     def test_low_liquidity_is_rejected_by_quality_gate(self):
         world = World()
-        c, _, _, clock = build(world=world, settings=Settings(min_liquidity_usd=Decimal("999999999")))
+        c, _, _, clock = build(
+            world=world, settings=Settings(min_liquidity_usd=Decimal(999999999))
+        )
         original_fetch = c.scan._market.fetch_pairs
+
         def mature_pair_fetch(chain, mint):
-            return [replace(pair, pair_created_at=clock.now() - timedelta(days=2)) for pair in original_fetch(chain, mint)]
+            return [
+                replace(pair, pair_created_at=clock.now() - timedelta(days=2))
+                for pair in original_fetch(chain, mint)
+            ]
+
         c.scan._market.fetch_pairs = mature_pair_fetch
         for _ in range(20):
             c.scan.execute("solana", [TOKEN_MINT])
             clock.advance(91)
-        reasons = {r for row in c.db.query_all("SELECT reasons FROM signals") for r in json.loads(row["reasons"])}
+        reasons = {
+            r
+            for row in c.db.query_all("SELECT reasons FROM signals")
+            for r in json.loads(row["reasons"])
+        }
         self.assertIn("LOW_LIQUIDITY", reasons)
+
 
 class ConfigLockTest(unittest.TestCase):
     def test_live_mode_cannot_be_built_into_container(self):
         with self.assertRaises(ConfigurationError):
             Settings.from_env({"BANGZEN_LIVE_TRADING": "true"})
+
 
 class FileDatabaseTest(unittest.TestCase):
     def test_migrations_rerun_safely_on_file_database(self):
@@ -406,11 +555,26 @@ class FileDatabaseTest(unittest.TestCase):
             world = World()
             c1, _, _, _ = build(world=world)
             c1.db.close()
-            c2 = build_container(Settings(), transport=RecordingTransport(world.handler), clock=clock_at(0), sleep=lambda s: None, db_path=path)
+            c2 = build_container(
+                Settings(),
+                transport=RecordingTransport(world.handler),
+                clock=clock_at(0),
+                sleep=lambda s: None,
+                db_path=path,
+            )
             c2.db.close()
-            c3 = build_container(Settings(), transport=RecordingTransport(world.handler), clock=clock_at(0), sleep=lambda s: None, db_path=path)
-            self.assertEqual(c3.db.query_one("SELECT COUNT(*) AS n FROM schema_migrations")["n"], 5)
+            c3 = build_container(
+                Settings(),
+                transport=RecordingTransport(world.handler),
+                clock=clock_at(0),
+                sleep=lambda s: None,
+                db_path=path,
+            )
+            self.assertEqual(
+                c3.db.query_one("SELECT COUNT(*) AS n FROM schema_migrations")["n"], 5
+            )
             c3.db.close()
+
 
 if __name__ == "__main__":
     unittest.main()

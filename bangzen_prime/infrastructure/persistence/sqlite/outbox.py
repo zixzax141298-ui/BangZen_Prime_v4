@@ -10,7 +10,11 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from bangzen_prime.domain.shared import DomainEvent
-from bangzen_prime.infrastructure.persistence.sqlite.database import Database, parse_iso, utc_iso
+from bangzen_prime.infrastructure.persistence.sqlite.database import (
+    Database,
+    parse_iso,
+    utc_iso,
+)
 
 GENESIS_HASH = "0" * 64
 
@@ -34,8 +38,13 @@ class OutboxStore:
         self._conn.execute(
             "INSERT INTO outbox (id, event_name, payload, occurred_at, status, attempts,"
             " available_at) VALUES (?, ?, ?, ?, 'PENDING', 0, ?)",
-            (event.event_id, event.name, json.dumps(event.payload, sort_keys=True),
-             utc_iso(event.occurred_at), utc_iso(at)),
+            (
+                event.event_id,
+                event.name,
+                json.dumps(event.payload, sort_keys=True),
+                utc_iso(event.occurred_at),
+                utc_iso(at),
+            ),
         )
 
     def claim_due(self, now: datetime, lease: timedelta, limit: int) -> list[OutboxRow]:
@@ -49,37 +58,59 @@ class OutboxStore:
             "SELECT id FROM outbox WHERE (status = 'PENDING' AND available_at <= ?)"
             " OR (status = 'PROCESSING' AND lease_until <= ?)"
             " ORDER BY available_at LIMIT ?",
-            (now_s, now_s, limit)).fetchall()
+            (now_s, now_s, limit),
+        ).fetchall()
         ids = [row["id"] for row in rows]
         for event_id in ids:
             self._conn.execute(
                 "UPDATE outbox SET status = 'PROCESSING', lease_until = ? WHERE id = ?",
-                (lease_s, event_id))
+                (lease_s, event_id),
+            )
         claimed = self._conn.execute(
-            f"SELECT * FROM outbox WHERE id IN ({','.join('?' * len(ids))})" if ids else
-            "SELECT * FROM outbox WHERE 0", tuple(ids)).fetchall()
-        return [OutboxRow(r["id"], r["event_name"], json.loads(r["payload"]),
-                          parse_iso(r["occurred_at"]), r["attempts"]) for r in claimed]
+            (
+                f"SELECT * FROM outbox WHERE id IN ({','.join('?' * len(ids))})"
+                if ids
+                else "SELECT * FROM outbox WHERE 0"
+            ),
+            tuple(ids),
+        ).fetchall()
+        return [
+            OutboxRow(
+                r["id"],
+                r["event_name"],
+                json.loads(r["payload"]),
+                parse_iso(r["occurred_at"]),
+                r["attempts"],
+            )
+            for r in claimed
+        ]
 
     def mark_sent(self, event_id: str, at: datetime) -> None:
         self._conn.execute(
             "UPDATE outbox SET status = 'SENT', sent_at = ?, lease_until = NULL WHERE id = ?",
-            (utc_iso(at), event_id))
+            (utc_iso(at), event_id),
+        )
 
-    def reschedule(self, event_id: str, *, attempts: int, available_at: datetime,
-                   error: str) -> None:
+    def reschedule(
+        self, event_id: str, *, attempts: int, available_at: datetime, error: str
+    ) -> None:
         self._conn.execute(
             "UPDATE outbox SET status = 'PENDING', attempts = ?, available_at = ?,"
             " lease_until = NULL, last_error = ? WHERE id = ?",
-            (attempts, utc_iso(available_at), error[:500], event_id))
+            (attempts, utc_iso(available_at), error[:500], event_id),
+        )
 
     def dead_letter(self, event_id: str, *, attempts: int, error: str) -> None:
         self._conn.execute(
             "UPDATE outbox SET status = 'FAILED', attempts = ?, lease_until = NULL,"
-            " last_error = ? WHERE id = ?", (attempts, error[:500], event_id))
+            " last_error = ? WHERE id = ?",
+            (attempts, error[:500], event_id),
+        )
 
     def status_of(self, event_id: str) -> dict | None:
-        row = self._conn.execute("SELECT * FROM outbox WHERE id = ?", (event_id,)).fetchone()
+        row = self._conn.execute(
+            "SELECT * FROM outbox WHERE id = ?", (event_id,)
+        ).fetchone()
         return dict(row) if row else None
 
 
@@ -88,15 +119,21 @@ class ProcessedEventStore:
         self._db = db
 
     def is_processed(self, subscriber: str, event_id: str) -> bool:
-        return self._db.query_one(
-            "SELECT 1 FROM processed_events WHERE subscriber = ? AND event_id = ?",
-            (subscriber, event_id)) is not None
+        return (
+            self._db.query_one(
+                "SELECT 1 FROM processed_events WHERE subscriber = ? AND event_id = ?",
+                (subscriber, event_id),
+            )
+            is not None
+        )
 
     def mark_processed(self, subscriber: str, event_id: str, at: datetime) -> None:
         with self._db.transaction() as conn:
             conn.execute(
                 "INSERT OR IGNORE INTO processed_events (subscriber, event_id, processed_at)"
-                " VALUES (?, ?, ?)", (subscriber, event_id, utc_iso(at)))
+                " VALUES (?, ?, ?)",
+                (subscriber, event_id, utc_iso(at)),
+            )
 
 
 def _entry_hash(prev_hash: str, event_type: str, occurred_at: str, payload: str) -> str:
@@ -109,21 +146,29 @@ class AuditLog:
         self._conn = conn
 
     def append(self, event_type: str, payload: dict[str, Any], at: datetime) -> str:
-        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
-        last = self._conn.execute("SELECT hash FROM audit_log ORDER BY seq DESC LIMIT 1").fetchone()
+        canonical = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), default=str
+        )
+        last = self._conn.execute(
+            "SELECT hash FROM audit_log ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
         prev = last["hash"] if last else GENESIS_HASH
         when = utc_iso(at)
         digest = _entry_hash(prev, event_type, when, canonical)
         self._conn.execute(
             "INSERT INTO audit_log (event_type, payload, occurred_at, prev_hash, hash)"
-            " VALUES (?, ?, ?, ?, ?)", (event_type, canonical, when, prev, digest))
+            " VALUES (?, ?, ?, ?, ?)",
+            (event_type, canonical, when, prev, digest),
+        )
         return digest
 
     def verify(self) -> int | None:
         """Return the first broken sequence number, or None if the chain is intact."""
         prev = GENESIS_HASH
         for row in self._conn.execute("SELECT * FROM audit_log ORDER BY seq"):
-            expected = _entry_hash(prev, row["event_type"], row["occurred_at"], row["payload"])
+            expected = _entry_hash(
+                prev, row["event_type"], row["occurred_at"], row["payload"]
+            )
             if row["prev_hash"] != prev or row["hash"] != expected:
                 return int(row["seq"])
             prev = row["hash"]

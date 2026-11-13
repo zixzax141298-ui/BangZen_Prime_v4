@@ -10,7 +10,6 @@ from bangzen_prime.domain.signals import PriceLevels, Signal
 from bangzen_prime.domain.tokens import pair_identity, token_identity
 from bangzen_prime.errors import DomainError
 
-
 MINT = "So11111111111111111111111111111111111111112"
 PAIR = "PairAddressFixture"
 NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)

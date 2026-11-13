@@ -1,14 +1,15 @@
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Callable
 
 logger = logging.getLogger(__name__)
 
 SESSION_US = "US"
 SESSION_ASIA = "ASIA"
 SESSION_EUROPE = "EUROPE"
+
 
 @dataclass(frozen=True)
 class SessionReport:
@@ -18,6 +19,7 @@ class SessionReport:
     suggested_min_quality: int
     hour_utc: int
     reason: str
+
 
 class SessionManager:
     """
@@ -48,13 +50,17 @@ class SessionManager:
             return SESSION_ASIA, Decimal("0.8")
         return SESSION_EUROPE, Decimal("1.0")
 
-    def apply_to_max_signals(self, base_max_signals: int, multiplier: Decimal | None = None) -> int:
+    def apply_to_max_signals(
+        self, base_max_signals: int, multiplier: Decimal | None = None
+    ) -> int:
         if multiplier is None:
             _, multiplier = self.get_multiplier()
         adjusted = round(Decimal(str(base_max_signals)) * multiplier)
         return max(1, int(adjusted))
 
-    def apply_to_min_quality(self, base_min_quality: int, multiplier: Decimal | None = None) -> int:
+    def apply_to_min_quality(
+        self, base_min_quality: int, multiplier: Decimal | None = None
+    ) -> int:
         if multiplier is None:
             _, multiplier = self.get_multiplier()
 
@@ -65,9 +71,7 @@ class SessionManager:
         return max(1, min(100, int(adjusted)))
 
     def get_session_report(
-        self,
-        base_max_signals: int = 3,
-        base_min_quality: int = 60
+        self, base_max_signals: int = 3, base_min_quality: int = 60
     ) -> SessionReport:
         hour = self._get_hour_utc()
         session_name, multiplier = self.get_multiplier(hour)
@@ -83,5 +87,5 @@ class SessionManager:
             suggested_max_signals=max_signals,
             suggested_min_quality=min_quality,
             hour_utc=hour,
-            reason=reason
+            reason=reason,
         )

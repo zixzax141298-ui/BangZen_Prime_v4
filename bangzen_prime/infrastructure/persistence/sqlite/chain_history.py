@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from bangzen_prime.infrastructure.adapters.chain.helius_history import HistoricalSignaturePage
+from bangzen_prime.infrastructure.adapters.chain.helius_history import (
+    HistoricalSignaturePage,
+)
 from bangzen_prime.infrastructure.persistence.sqlite.database import Database, utc_iso
 
 
@@ -54,7 +56,9 @@ class ChainHistoryStore:
                 (page.address,),
             ).fetchone()
             pages = (current["pages_fetched"] if current else 0) + 1
-            last_signature = page.entries[-1].signature if page.entries else page.before_signature
+            last_signature = (
+                page.entries[-1].signature if page.entries else page.before_signature
+            )
             last_slot = page.entries[-1].slot if page.entries else None
             status = "EXHAUSTED" if page.exhausted else "MORE_AVAILABLE"
             conn.execute(

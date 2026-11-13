@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -18,12 +18,12 @@ from bangzen_prime.application.execution_use_case import (
 from bangzen_prime.application.mode_controller import ModeController
 from bangzen_prime.application.ports import SimulationResult
 from bangzen_prime.domain.operating_mode import OperatingMode
-from bangzen_prime.errors import DomainError
 
-NOW = datetime(2026, 11, 13, 15, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 11, 13, 15, 0, tzinfo=UTC)
 SOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 TAKER = "11111111111111111111111111111111"
+
 
 def plan(**kwargs: Any) -> ExecutionPlan:
     base = dict(
@@ -37,10 +37,12 @@ def plan(**kwargs: Any) -> ExecutionPlan:
     base.update(kwargs)
     return ExecutionPlan(**base)
 
+
 @dataclass
 class FakeOrder:
     request_id: str
     transaction_b64: str
+
 
 class FakeJupiter:
     def __init__(self, order: FakeOrder | Exception | None = None) -> None:
@@ -58,6 +60,7 @@ class FakeJupiter:
         self.execute_calls += 1
         return object()
 
+
 class FakeSigner:
     def __init__(self, result: str | Exception = "c2lnbmVk") -> None:
         self.calls = 0
@@ -68,6 +71,7 @@ class FakeSigner:
         if isinstance(self._result, Exception):
             raise self._result
         return self._result
+
 
 class FakeHelius:
     def __init__(
@@ -92,12 +96,14 @@ class FakeHelius:
             raise self._send
         return self._send
 
+
 class FakeNotifier:
     def __init__(self) -> None:
         self.messages: list[str] = []
 
     async def send(self, text: str) -> None:
         self.messages.append(text)
+
 
 class FakePaperFill:
     def __init__(self) -> None:
@@ -107,6 +113,7 @@ class FakePaperFill:
         self.calls += 1
         return f"paper-{plan.client_order_id}"
 
+
 class ExecutionUseCaseModeTests(unittest.IsolatedAsyncioTestCase):
     async def test_telegram_only_never_calls_adapters(self):
         jup, signer, helius = FakeJupiter(), FakeSigner(), FakeHelius()
@@ -114,7 +121,11 @@ class ExecutionUseCaseModeTests(unittest.IsolatedAsyncioTestCase):
         uc = ExecutionUseCase(
             mode_controller=ModeController(OperatingMode.TELEGRAM_ONLY),
             policy=ExecutionPolicy(live_enabled=True, paper_trading=True, dry_run=True),
-            jupiter=jup, signer=signer, helius=helius, notifier=notifier, clock=lambda: NOW,
+            jupiter=jup,
+            signer=signer,
+            helius=helius,
+            notifier=notifier,
+            clock=lambda: NOW,
         )
         result = await uc.execute(plan())
         self.assertEqual(result.status, TradeStatus.NOTIFIED_ONLY)
@@ -128,9 +139,13 @@ class ExecutionUseCaseModeTests(unittest.IsolatedAsyncioTestCase):
         paper = FakePaperFill()
         uc = ExecutionUseCase(
             mode_controller=ModeController(OperatingMode.EXECUTION_ONLY),
-            policy=ExecutionPolicy(live_enabled=False, paper_trading=True, dry_run=True),
-            notifier=notifier, paper_fill=paper,
-            market_price_lookup=lambda _m: _coro(Decimal("2.5")), clock=lambda: NOW,
+            policy=ExecutionPolicy(
+                live_enabled=False, paper_trading=True, dry_run=True
+            ),
+            notifier=notifier,
+            paper_fill=paper,
+            market_price_lookup=lambda _m: _coro(Decimal("2.5")),
+            clock=lambda: NOW,
         )
         result = await uc.execute(plan())
         self.assertEqual(result.status, TradeStatus.PAPER_FILLED)
@@ -141,19 +156,29 @@ class ExecutionUseCaseModeTests(unittest.IsolatedAsyncioTestCase):
         notifier = FakeNotifier()
         uc = ExecutionUseCase(
             mode_controller=ModeController(OperatingMode.HYBRID),
-            policy=ExecutionPolicy(live_enabled=False, paper_trading=True, dry_run=True),
-            notifier=notifier, market_price_lookup=lambda _m: _coro(Decimal("1")), clock=lambda: NOW,
+            policy=ExecutionPolicy(
+                live_enabled=False, paper_trading=True, dry_run=True
+            ),
+            notifier=notifier,
+            market_price_lookup=lambda _m: _coro(Decimal(1)),
+            clock=lambda: NOW,
         )
         result = await uc.execute(plan())
         self.assertEqual(result.status, TradeStatus.PAPER_FILLED)
         self.assertIn("PAPER_FILLED", notifier.messages[0])
 
+
 class ExecutionUseCaseLiveTests(unittest.IsolatedAsyncioTestCase):
-    def _live_uc(self, *, jup=None, signer=None, helius=None, mode=OperatingMode.EXECUTION_ONLY):
+    def _live_uc(
+        self, *, jup=None, signer=None, helius=None, mode=OperatingMode.EXECUTION_ONLY
+    ):
         return ExecutionUseCase(
             mode_controller=ModeController(mode),
             policy=ExecutionPolicy(live_enabled=True, paper_trading=True, dry_run=True),
-            jupiter=jup or FakeJupiter(), signer=signer or FakeSigner(), helius=helius or FakeHelius(), clock=lambda: NOW,
+            jupiter=jup or FakeJupiter(),
+            signer=signer or FakeSigner(),
+            helius=helius or FakeHelius(),
+            clock=lambda: NOW,
         )
 
     async def test_live_happy_path_order_sign_simulate_send(self):
@@ -185,14 +210,17 @@ class ExecutionUseCaseLiveTests(unittest.IsolatedAsyncioTestCase):
         uc = ExecutionUseCase(
             mode_controller=ModeController(OperatingMode.HYBRID),
             policy=ExecutionPolicy(live_enabled=True, emergency_stop=True),
-            jupiter=jup, clock=lambda: NOW,
+            jupiter=jup,
+            clock=lambda: NOW,
         )
         result = await uc.execute(plan())
         self.assertEqual(result.status, TradeStatus.REJECTED)
         self.assertIn("EMERGENCY_STOP", result.reason_codes)
         self.assertEqual(jup.order_calls, 0)
 
+
 def _coro(value):
     async def _inner(*_a, **_k):
         return value
+
     return _inner()

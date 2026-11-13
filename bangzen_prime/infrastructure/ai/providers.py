@@ -15,7 +15,11 @@ from datetime import datetime  # noqa: F401 - kept for signature symmetry
 from typing import Any
 
 from bangzen_prime.errors import ConfigurationError, ExternalServiceError
-from bangzen_prime.infrastructure.http import HttpRequest, RequestTransport, request_json
+from bangzen_prime.infrastructure.http import (
+    HttpRequest,
+    RequestTransport,
+    request_json,
+)
 from bangzen_prime.infrastructure.resilience.policies import ResilientCaller
 
 MAX_OUTPUT_TOKENS = 300
@@ -24,8 +28,15 @@ MAX_OUTPUT_TOKENS = 300
 class _Base:
     name = "base"
 
-    def __init__(self, *, api_key: str, model: str, transport: RequestTransport,
-                 caller: ResilientCaller, timeout: float) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        transport: RequestTransport,
+        caller: ResilientCaller,
+        timeout: float,
+    ) -> None:
         if not api_key:
             raise ConfigurationError(f"{self.name} API key is required")
         if not model:
@@ -37,10 +48,18 @@ class _Base:
         self._timeout = timeout
 
     def _post(self, url: str, headers: dict[str, str], body: dict) -> Any:
-        request = HttpRequest("POST", url, {**headers, "Content-Type": "application/json"},
-                              json.dumps(body).encode("utf-8"), self._timeout)
-        return self._caller.call(lambda: request_json(service=self.name, request=request,
-                                                      transport=self._transport))
+        request = HttpRequest(
+            "POST",
+            url,
+            {**headers, "Content-Type": "application/json"},
+            json.dumps(body).encode("utf-8"),
+            self._timeout,
+        )
+        return self._caller.call(
+            lambda: request_json(
+                service=self.name, request=request, transport=self._transport
+            )
+        )
 
     def complete(self, system: str, user: str) -> str:  # pragma: no cover - overridden
         raise NotImplementedError
@@ -51,29 +70,54 @@ class AnthropicProvider(_Base):
     URL = "https://api.anthropic.com/v1/messages"
 
     def complete(self, system: str, user: str) -> str:
-        payload = self._post(self.URL, {"x-api-key": self._key, "anthropic-version": "2023-06-01"},
-                             {"model": self._model, "max_tokens": MAX_OUTPUT_TOKENS, "system": system,
-                              "messages": [{"role": "user", "content": user}]})
+        payload = self._post(
+            self.URL,
+            {"x-api-key": self._key, "anthropic-version": "2023-06-01"},
+            {
+                "model": self._model,
+                "max_tokens": MAX_OUTPUT_TOKENS,
+                "system": system,
+                "messages": [{"role": "user", "content": user}],
+            },
+        )
         try:
-            return "".join(block["text"] for block in payload["content"] if block.get("type") == "text")
+            return "".join(
+                block["text"]
+                for block in payload["content"]
+                if block.get("type") == "text"
+            )
         except (KeyError, TypeError, AttributeError):
-            raise ExternalServiceError("anthropic returned an unexpected shape", service=self.name,
-                                       retryable=False) from None
+            raise ExternalServiceError(
+                "anthropic returned an unexpected shape",
+                service=self.name,
+                retryable=False,
+            ) from None
 
 
 class _OpenAICompatible(_Base):
     URL = ""
 
     def complete(self, system: str, user: str) -> str:
-        payload = self._post(self.URL, {"Authorization": f"Bearer {self._key}"},
-                             {"model": self._model, "max_tokens": MAX_OUTPUT_TOKENS,
-                              "messages": [{"role": "system", "content": system},
-                                           {"role": "user", "content": user}]})
+        payload = self._post(
+            self.URL,
+            {"Authorization": f"Bearer {self._key}"},
+            {
+                "model": self._model,
+                "max_tokens": MAX_OUTPUT_TOKENS,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            },
+        )
         try:
             return str(payload["choices"][0]["message"]["content"])
         except (KeyError, IndexError, TypeError):
-            raise ExternalServiceError(f"{self.name} returned an unexpected shape", service=self.name,
-                                       retryable=False) from None
+            raise ExternalServiceError(
+                f"{self.name} returned an unexpected shape",
+                service=self.name,
+                retryable=False,
+            ) from None
 
 
 class OpenAIProvider(_OpenAICompatible):
@@ -86,15 +130,30 @@ class GrokProvider(_OpenAICompatible):
     URL = "https://api.x.ai/v1/chat/completions"
 
 
-PROVIDERS: dict[str, type[_Base]] = {"anthropic": AnthropicProvider, "openai": OpenAIProvider,
-                                     "grok": GrokProvider}
+PROVIDERS: dict[str, type[_Base]] = {
+    "anthropic": AnthropicProvider,
+    "openai": OpenAIProvider,
+    "grok": GrokProvider,
+}
 
 
-def build_provider(*, name: str, api_key: str | None, model: str | None, transport: RequestTransport,
-                   caller: ResilientCaller, timeout: float) -> _Base:
+def build_provider(
+    *,
+    name: str,
+    api_key: str | None,
+    model: str | None,
+    transport: RequestTransport,
+    caller: ResilientCaller,
+    timeout: float,
+) -> _Base:
     cls = PROVIDERS.get(name)
     if cls is None:
         raise ConfigurationError("unknown AI provider")
     defaults = {"anthropic": "claude-opus-4-1", "openai": "gpt-4o", "grok": "grok-4"}
-    return cls(api_key=api_key or "", model=model or defaults[name], transport=transport,
-               caller=caller, timeout=timeout)
+    return cls(
+        api_key=api_key or "",
+        model=model or defaults[name],
+        transport=transport,
+        caller=caller,
+        timeout=timeout,
+    )

@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 class PumpfunParams:
     early_min_age_min: Decimal = Decimal("0.5")
     early_max_age_min: Decimal = Decimal("10.0")
-    early_min_mcap: Decimal = Decimal("5000")
-    early_max_mcap: Decimal = Decimal("50000")
+    early_min_mcap: Decimal = Decimal(5000)
+    early_max_mcap: Decimal = Decimal(50000)
     early_min_holders: int = 30
     early_max_holders: int = 500
     early_max_top10: Decimal = Decimal("35.0")
@@ -62,7 +62,7 @@ class RealisticPumpfunEngine:
     def __init__(self, params: PumpfunParams | None = None):
         self.p = params or PumpfunParams()
 
-    def _safe_decimal(self, value: Any, default: Decimal = Decimal("0")) -> Decimal:
+    def _safe_decimal(self, value: Any, default: Decimal = Decimal(0)) -> Decimal:
         try:
             if value is None:
                 return default
@@ -89,7 +89,7 @@ class RealisticPumpfunEngine:
         if share >= 1:
             return Decimal("5.0")
         if share <= 0:
-            return Decimal("0")
+            return Decimal(0)
         return min(share / (Decimal("1.0") - share), Decimal("5.0"))
 
     def _detect_early(self, m: dict, a: dict) -> bool:
@@ -108,7 +108,9 @@ class RealisticPumpfunEngine:
             return False
         if self._safe_decimal(a.get("dev_pct")) > self.p.early_max_dev:
             return False
-        bundle = self._safe_decimal(a.get("bundler_total_pct")) + self._safe_decimal(a.get("snipers_pct"))
+        bundle = self._safe_decimal(a.get("bundler_total_pct")) + self._safe_decimal(
+            a.get("snipers_pct")
+        )
         if bundle > self.p.early_max_bundle:
             return False
         unique_5m = self._safe_int(m.get("buyers_m5") or m.get("unique_buyers_m5"))
@@ -134,15 +136,21 @@ class RealisticPumpfunEngine:
             return False
         if self._safe_decimal(a.get("dev_pct")) > self.p.final_max_dev:
             return False
-        bundle = self._safe_decimal(a.get("bundler_total_pct")) + self._safe_decimal(a.get("snipers_pct"))
+        bundle = self._safe_decimal(a.get("bundler_total_pct")) + self._safe_decimal(
+            a.get("snipers_pct")
+        )
         if bundle > self.p.final_max_bundle:
             return False
-        unique_10m = self._safe_int(m.get("buyers_m10") or m.get("unique_buyers_m10") or m.get("buyers_m5"))
+        unique_10m = self._safe_int(
+            m.get("buyers_m10") or m.get("unique_buyers_m10") or m.get("buyers_m5")
+        )
         if unique_10m < self.p.final_min_unique_buyers_10m:
             return False
         if self._get_bs_m5(m) < self.p.final_min_buy_sell_ratio_5m:
             return False
-        early_ret = self._safe_decimal(a.get("early_holder_retention_pct") or a.get("top_early_pct"))
+        early_ret = self._safe_decimal(
+            a.get("early_holder_retention_pct") or a.get("top_early_pct")
+        )
         if early_ret > self.p.final_max_early_holder_retention:
             return False
         return True
@@ -152,14 +160,16 @@ class RealisticPumpfunEngine:
         has_quality_sm = sm_count >= self.p.hold_min_smart_money
         if has_quality_sm:
             return RealisticTradePlan(
-                setup=setup, mode="HOLD",
+                setup=setup,
+                mode="HOLD",
                 trailing_pct=self.p.hold_trail_pct,
                 hard_tp_pct=self.p.hold_hard_tp_pct,
                 time_stop_min=self.p.hold_time_stop_min,
                 has_quality_smart_money=True,
             )
         return RealisticTradePlan(
-            setup=setup, mode="SCALP",
+            setup=setup,
+            mode="SCALP",
             tp1_pct=self.p.scalp_tp_pct,
             sl_pct=self.p.scalp_sl_pct,
             time_stop_min=self.p.scalp_time_stop_min,
@@ -169,8 +179,12 @@ class RealisticPumpfunEngine:
     def evaluate(self, m: dict, a: dict) -> RealisticPumpfunReport:
         if self._detect_early(m, a):
             plan = self._build_plan("PUMPFUN_EARLY", a)
-            return RealisticPumpfunReport(status="PUMPFUN_EARLY", reason="all_filters_passed", plan=plan)
+            return RealisticPumpfunReport(
+                status="PUMPFUN_EARLY", reason="all_filters_passed", plan=plan
+            )
         if self._detect_final(m, a):
             plan = self._build_plan("PUMPFUN_FINAL", a)
-            return RealisticPumpfunReport(status="PUMPFUN_FINAL", reason="all_filters_passed", plan=plan)
+            return RealisticPumpfunReport(
+                status="PUMPFUN_FINAL", reason="all_filters_passed", plan=plan
+            )
         return RealisticPumpfunReport(status="NONE", reason="no_match")

@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class ExitSignalReport:
 # ============================================================
 # HELPER
 # ============================================================
-def _safe_decimal(value: Any, default: Decimal = Decimal("0")) -> Decimal:
+def _safe_decimal(value: Any, default: Decimal = Decimal(0)) -> Decimal:
     try:
         if value is None:
             return default
@@ -55,12 +55,14 @@ def _safe_int(value: Any, default: int = 0) -> int:
 # ============================================================
 # INDIKATOR DASAR
 # ============================================================
-def calculate_rsi(closes: list[Decimal], period: int = DEFAULT_RSI_PERIOD) -> Decimal | None:
+def calculate_rsi(
+    closes: list[Decimal], period: int = DEFAULT_RSI_PERIOD
+) -> Decimal | None:
     if len(closes) < period + 1:
         return None
 
-    gains = Decimal("0")
-    losses = Decimal("0")
+    gains = Decimal(0)
+    losses = Decimal(0)
 
     for i in range(1, period + 1):
         change = closes[i] - closes[i - 1]
@@ -74,8 +76,8 @@ def calculate_rsi(closes: list[Decimal], period: int = DEFAULT_RSI_PERIOD) -> De
 
     for i in range(period + 1, len(closes)):
         change = closes[i] - closes[i - 1]
-        gain = change if change > 0 else Decimal("0")
-        loss = abs(change) if change < 0 else Decimal("0")
+        gain = change if change > 0 else Decimal(0)
+        loss = abs(change) if change < 0 else Decimal(0)
 
         avg_g = (avg_g * Decimal(str(period - 1)) + gain) / Decimal(str(period))
         avg_l = (avg_l * Decimal(str(period - 1)) + loss) / Decimal(str(period))
@@ -86,12 +88,15 @@ def calculate_rsi(closes: list[Decimal], period: int = DEFAULT_RSI_PERIOD) -> De
         return Decimal("0.0")
 
     rs = avg_g / avg_l
-    rsi = Decimal("100") - (Decimal("100") / (Decimal("1") + rs))
+    rsi = Decimal(100) - (Decimal(100) / (Decimal(1) + rs))
     return rsi.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def calculate_atr(
-    highs: list[Decimal], lows: list[Decimal], closes: list[Decimal], period: int = DEFAULT_ATR_PERIOD
+    highs: list[Decimal],
+    lows: list[Decimal],
+    closes: list[Decimal],
+    period: int = DEFAULT_ATR_PERIOD,
 ) -> Decimal | None:
     if len(closes) < period + 1:
         return None
@@ -112,10 +117,10 @@ def calculate_atr(
 def ema_series(values: list[Decimal], period: int) -> list[Decimal]:
     if not values:
         return []
-    k = Decimal("2") / (Decimal(str(period)) + Decimal("1"))
+    k = Decimal(2) / (Decimal(str(period)) + Decimal(1))
     out = [values[0]]
     for v in values[1:]:
-        out.append(v * k + out[-1] * (Decimal("1") - k))
+        out.append(v * k + out[-1] * (Decimal(1) - k))
     return out
 
 
@@ -156,9 +161,15 @@ def structure_metrics(
     pre_low = min(l[: ath_idx + 1])
     low_after = min(l[ath_idx:])
 
-    pump_leg = (ath / pre_low - Decimal("1")) * Decimal("100") if pre_low > 0 else Decimal("0")
-    dd = max(Decimal("0"), (ath - current_price) / ath * Decimal("100"))
-    bounce = (current_price / low_after - Decimal("1")) * Decimal("100") if low_after > 0 else Decimal("0")
+    pump_leg = (
+        (ath / pre_low - Decimal(1)) * Decimal(100) if pre_low > 0 else Decimal(0)
+    )
+    dd = max(Decimal(0), (ath - current_price) / ath * Decimal(100))
+    bounce = (
+        (current_price / low_after - Decimal(1)) * Decimal(100)
+        if low_after > 0
+        else Decimal(0)
+    )
 
     piv = [p for p in pivot_lows(l) if p[0] >= ath_idx]
     higher_low = len(piv) >= 2 and piv[-1][1] >= piv[-2][1] * Decimal("1.01")
@@ -166,15 +177,21 @@ def structure_metrics(
 
     ema = ema_series(c_, DEFAULT_EMA_PERIOD)
     ema20 = ema[-1]
-    ema_slope = (ema[-1] / ema[-4] - Decimal("1")) * Decimal("100") if len(ema) >= 4 and ema[-4] > 0 else Decimal("0")
-    price_vs_ema = (current_price / ema20 - Decimal("1")) * Decimal("100") if ema20 > 0 else Decimal("0")
+    ema_slope = (
+        (ema[-1] / ema[-4] - Decimal(1)) * Decimal(100)
+        if len(ema) >= 4 and ema[-4] > 0
+        else Decimal(0)
+    )
+    price_vs_ema = (
+        (current_price / ema20 - Decimal(1)) * Decimal(100) if ema20 > 0 else Decimal(0)
+    )
 
-    recent_v = (v[-3] + v[-2]) / Decimal("2") if len(v) >= 3 else Decimal("0")
+    recent_v = (v[-3] + v[-2]) / Decimal(2) if len(v) >= 3 else Decimal(0)
     base_list = v[-15:-3] if len(v) >= 15 else v[:-3]
-    base_v = sum(base_list) / Decimal(str(len(base_list))) if base_list else Decimal("0")
+    base_v = sum(base_list) / Decimal(str(len(base_list))) if base_list else Decimal(0)
     vol_ratio = recent_v / base_v if base_v > 0 else Decimal("1.0")
 
-    drops = [(c_[i] - o[i]) / o[i] * Decimal("100") for i in range(-6, 0) if o[i] > 0]
+    drops = [(c_[i] - o[i]) / o[i] * Decimal(100) for i in range(-6, 0) if o[i] > 0]
     atr = calculate_atr(h, l, c_)
 
     streak = 0
@@ -184,12 +201,14 @@ def structure_metrics(
         else:
             break
 
-    wicks = [(h[i] - max(o[i], c_[i])) / (h[i] - l[i]) for i in range(-3, 0) if h[i] > l[i]]
-    upper_wick_avg = sum(wicks) / Decimal(str(len(wicks))) if wicks else Decimal("0")
+    wicks = [
+        (h[i] - max(o[i], c_[i])) / (h[i] - l[i]) for i in range(-3, 0) if h[i] > l[i]
+    ]
+    upper_wick_avg = sum(wicks) / Decimal(str(len(wicks))) if wicks else Decimal(0)
 
     near_high = current_price >= max(h[-12:]) * Decimal("0.97")
-    roll = [sum(v[i : i + 3]) / Decimal("3") for i in range(len(v) - 2)]
-    peak_roll = max(roll) if roll else Decimal("0")
+    roll = [sum(v[i : i + 3]) / Decimal(3) for i in range(len(v) - 2)]
+    peak_roll = max(roll) if roll else Decimal(0)
 
     return {
         "candles": len(candles),
@@ -205,14 +224,28 @@ def structure_metrics(
         "ema_slope": ema_slope.quantize(Decimal("0.01")),
         "price_vs_ema": price_vs_ema.quantize(Decimal("0.1")),
         "vol_ratio": vol_ratio.quantize(Decimal("0.01")),
-        "max_drop_6": (min(drops) if drops else Decimal("0.0")).quantize(Decimal("0.1")),
+        "max_drop_6": (min(drops) if drops else Decimal("0.0")).quantize(
+            Decimal("0.1")
+        ),
         "rsi": calculate_rsi(c_, DEFAULT_RSI_PERIOD),
-        "atr_pct": (atr / current_price * Decimal("100")).quantize(Decimal("0.01")) if atr and current_price > 0 else None,
+        "atr_pct": (
+            (atr / current_price * Decimal(100)).quantize(Decimal("0.01"))
+            if atr and current_price > 0
+            else None
+        ),
         "green_streak": streak,
         "upper_wick_avg": upper_wick_avg.quantize(Decimal("0.01")),
         "vol_divergence": bool(near_high and vol_ratio < Decimal("0.8")),
-        "ext_atr": ((current_price - ema20) / atr).quantize(Decimal("0.01")) if atr and atr > 0 else Decimal("0"),
-        "vol_retention": (recent_v / peak_roll).quantize(Decimal("0.01")) if peak_roll > 0 else Decimal("1.0"),
+        "ext_atr": (
+            ((current_price - ema20) / atr).quantize(Decimal("0.01"))
+            if atr and atr > 0
+            else Decimal(0)
+        ),
+        "vol_retention": (
+            (recent_v / peak_roll).quantize(Decimal("0.01"))
+            if peak_roll > 0
+            else Decimal("1.0")
+        ),
     }
 
 
@@ -248,7 +281,7 @@ def evaluate_exit_signals(
     vols = [_safe_decimal(c[4]) for c in c_list]
 
     ema = ema_series([_safe_decimal(c[3]) for c in candles], DEFAULT_EMA_PERIOD)
-    ema20 = ema[-1] if ema else Decimal("0")
+    ema20 = ema[-1] if ema else Decimal(0)
 
     lh_ema = (
         len(closes) >= 2
@@ -260,7 +293,7 @@ def evaluate_exit_signals(
     v_peak = (
         max([_safe_decimal(c[4]) for c in candles[-15:]])
         if len(candles) >= 15
-        else (max(vols) if vols else Decimal("0"))
+        else (max(vols) if vols else Decimal(0))
     )
     v_fading = vols[-1] <= v_peak * Decimal("0.50") if v_peak > 0 else False
 
@@ -270,7 +303,7 @@ def evaluate_exit_signals(
     seller_dom = bs_m5 < Decimal("0.45") and txns_m5 >= 10
 
     piv = pivot_lows([_safe_decimal(c[2]) for c in candles])
-    swing_low = piv[-1][1] if piv else (lows[-2] if len(lows) >= 2 else Decimal("0"))
+    swing_low = piv[-1][1] if piv else (lows[-2] if len(lows) >= 2 else Decimal(0))
     break_low = lows[-1] < swing_low * Decimal("0.99") if swing_low > 0 else False
 
     reasons = []

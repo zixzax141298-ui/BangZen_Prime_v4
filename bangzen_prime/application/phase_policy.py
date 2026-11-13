@@ -49,7 +49,7 @@ class Evidence:
 
 @dataclass(frozen=True)
 class PhaseRule:
-    mode: Action                                   # ENTER_PAPER or WATCH only
+    mode: Action  # ENTER_PAPER or WATCH only
     required: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
@@ -58,7 +58,9 @@ class PhaseRule:
         if not self.required <= EVIDENCE:
             raise ConfigurationError("unknown evidence name in phase rule")
         if self.mode is Action.ENTER_PAPER and not SAFETY_FLOOR <= self.required:
-            raise ConfigurationError("paper entry requires safety, holders, and ai evidence")
+            raise ConfigurationError(
+                "paper entry requires safety, holders, and ai evidence"
+            )
 
 
 @dataclass(frozen=True)
@@ -105,10 +107,18 @@ DEFAULT_RULES: dict[str, PhaseRule] = {
     # Very new pairs: observe only. Holder concentration changes fast here.
     "LAUNCH": PhaseRule(Action.WATCH, frozenset({"safety", "holders"})),
     # Early activity: paper entry needs liquidity and an intel check on top of the floor.
-    "EARLY": PhaseRule(Action.ENTER_PAPER, frozenset({"safety", "holders", "ai", "liquidity", "intel"})),
+    "EARLY": PhaseRule(
+        Action.ENTER_PAPER, frozenset({"safety", "holders", "ai", "liquidity", "intel"})
+    ),
     # Established growth: volume becomes a requirement.
-    "GROWTH": PhaseRule(Action.ENTER_PAPER, frozenset({"safety", "holders", "ai", "liquidity", "volume", "intel"})),
-    "MATURE": PhaseRule(Action.ENTER_PAPER, frozenset({"safety", "holders", "ai", "liquidity", "volume", "intel"})),
+    "GROWTH": PhaseRule(
+        Action.ENTER_PAPER,
+        frozenset({"safety", "holders", "ai", "liquidity", "volume", "intel"}),
+    ),
+    "MATURE": PhaseRule(
+        Action.ENTER_PAPER,
+        frozenset({"safety", "holders", "ai", "liquidity", "volume", "intel"}),
+    ),
     # CEX listed tokens are not a paper target in this version.
     "CEX_LISTED": PhaseRule(Action.WATCH, frozenset({"safety", "holders"})),
 }
@@ -123,20 +133,28 @@ def policy_from_dict(data: object) -> PhasePolicy:
     if not isinstance(data, dict) or set(data) != _TOP_KEYS:
         raise ConfigurationError("policy file must contain exactly: version, phases")
     if data["version"] != POLICY_VERSION or isinstance(data["version"], bool):
-        raise ConfigurationError(f"unsupported policy version (expected {POLICY_VERSION})")
+        raise ConfigurationError(
+            f"unsupported policy version (expected {POLICY_VERSION})"
+        )
     phases = data["phases"]
     if not isinstance(phases, dict) or set(phases) != PHASES:
         raise ConfigurationError("policy must define every phase exactly once")
     rules: dict[str, PhaseRule] = {}
     for name, raw in phases.items():
         if not isinstance(raw, dict) or set(raw) != _RULE_KEYS:
-            raise ConfigurationError(f"phase {name} must contain exactly: mode, required")
+            raise ConfigurationError(
+                f"phase {name} must contain exactly: mode, required"
+            )
         try:
             mode = Action(raw["mode"])
         except ValueError:
-            raise ConfigurationError(f"phase {name}: mode must be ENTER_PAPER or WATCH") from None
+            raise ConfigurationError(
+                f"phase {name}: mode must be ENTER_PAPER or WATCH"
+            ) from None
         required = raw["required"]
-        if not isinstance(required, list) or not all(isinstance(x, str) for x in required):
+        if not isinstance(required, list) or not all(
+            isinstance(x, str) for x in required
+        ):
             raise ConfigurationError(f"phase {name}: required must be a list of names")
         rules[name] = PhaseRule(mode, frozenset(required))
     return PhasePolicy(rules)

@@ -15,16 +15,28 @@ import os
 import re
 import shutil
 import sqlite3
-import stat
 import sys
 import tempfile
 import types
 import unittest
 from unittest import mock
 
-from bangzen_prime.errors import ConfigurationError, DomainError, ExternalServiceError, PersistenceError
-from bangzen_prime.infrastructure.adapters.messaging.telegram import MAX_MESSAGE_CHARS, build_message
-from bangzen_prime.infrastructure.http import _OPENER, _RefuseRedirects, HttpResponse, get_json
+from bangzen_prime.errors import (
+    ConfigurationError,
+    DomainError,
+    ExternalServiceError,
+    PersistenceError,
+)
+from bangzen_prime.infrastructure.adapters.messaging.telegram import (
+    MAX_MESSAGE_CHARS,
+    build_message,
+)
+from bangzen_prime.infrastructure.http import (
+    _OPENER,
+    HttpResponse,
+    _RefuseRedirects,
+    get_json,
+)
 from bangzen_prime.infrastructure.persistence.sqlite import maintenance
 from bangzen_prime.infrastructure.persistence.sqlite.database import Database
 from bangzen_prime.settings import Settings
@@ -32,16 +44,28 @@ from bangzen_prime.settings import Settings
 VALID_MINT = "So11111111111111111111111111111111111111112"
 _DANGLING_ENTITY = re.compile(r"&(?!(amp|lt|gt);)")
 
+
 class RedirectCredentialLeakTests(unittest.TestCase):
     def test_production_opener_refuses_redirects(self):
         self.assertTrue(any(isinstance(h, _RefuseRedirects) for h in _OPENER.handlers))
         handler = _RefuseRedirects()
-        self.assertIsNone(handler.redirect_request(None, None, 302, "Found", {}, "http://evil.example/"))
+        self.assertIsNone(
+            handler.redirect_request(
+                None, None, 302, "Found", {}, "http://evil.example/"
+            )
+        )
 
     def test_redirect_status_is_a_non_retryable_error(self):
-        transport = lambda url, timeout: HttpResponse(302, b"", {"Location": "http://evil.example/"})  # noqa: E731
+        transport = lambda url, timeout: HttpResponse(
+            302, b"", {"Location": "http://evil.example/"}
+        )
         with self.assertRaises(ExternalServiceError) as ctx:
-            get_json(service="rugcheck", url="https://api.rugcheck.xyz/v1/x", timeout=1, transport=transport)
+            get_json(
+                service="rugcheck",
+                url="https://api.rugcheck.xyz/v1/x",
+                timeout=1,
+                transport=transport,
+            )
         self.assertFalse(ctx.exception.retryable)
         self.assertIn("redirect refused", str(ctx.exception))
 
@@ -61,10 +85,12 @@ class TelegramTruncationTests(unittest.TestCase):
 
 class ChatIdValidationTests(unittest.TestCase):
     def _settings(self, ids: str) -> Settings:
-        return Settings.from_env({
-            "BANGZEN_TELEGRAM_BOT_TOKEN": "123:ABC",
-            "BANGZEN_TELEGRAM_ALLOWED_CHAT_IDS": ids,
-        })
+        return Settings.from_env(
+            {
+                "BANGZEN_TELEGRAM_BOT_TOKEN": "123:ABC",
+                "BANGZEN_TELEGRAM_ALLOWED_CHAT_IDS": ids,
+            }
+        )
 
     def test_unicode_digits_are_rejected(self):
         # str.isdigit() accepts "²", so the old check let a non-numeric id through.
@@ -73,7 +99,10 @@ class ChatIdValidationTests(unittest.TestCase):
             self._settings("²")
 
     def test_ascii_ids_including_negative_groups_are_accepted(self):
-        self.assertEqual(self._settings("12345,-100987").telegram_allowed_chat_ids, ("12345", "-100987"))
+        self.assertEqual(
+            self._settings("12345,-100987").telegram_allowed_chat_ids,
+            ("12345", "-100987"),
+        )
 
     def test_mixed_garbage_is_rejected(self):
         for bad in ("12a", "--1", "1 2", "١٢٣"):
@@ -90,7 +119,9 @@ class ReadOnlyBackupVerificationTests(unittest.TestCase):
         db.migrate()
         db.close()
         conn = sqlite3.connect(self.backup)
-        conn.execute("PRAGMA journal_mode=DELETE")  # the form a copied backup normally has
+        conn.execute(
+            "PRAGMA journal_mode=DELETE"
+        )  # the form a copied backup normally has
         conn.close()
 
     def _digest(self, path: str) -> str:
@@ -134,6 +165,7 @@ def _import_intel_cli():
         sys.modules["httpx"] = types.ModuleType("httpx")
     try:
         from bangzen_prime.interfaces import intel_cli
+
         return intel_cli
     finally:
         if added:
@@ -167,10 +199,13 @@ class IntelCliTests(unittest.TestCase):
 class DashboardOptionalDependencyTests(unittest.TestCase):
     def test_missing_dashboard_extra_gives_actionable_message(self):
         from bangzen_prime.interfaces import cli
+
         err = io.StringIO()
         # Setting a sys.modules entry to None makes the import raise ImportError deterministically.
-        with mock.patch.dict(sys.modules, {"bangzen_prime.interfaces.dashboard": None}), \
-                contextlib.redirect_stderr(err):
+        with (
+            mock.patch.dict(sys.modules, {"bangzen_prime.interfaces.dashboard": None}),
+            contextlib.redirect_stderr(err),
+        ):
             code = cli.main(["dashboard"])
         self.assertEqual(code, cli.EXIT_ERROR)
         self.assertIn("bangzen-prime[dashboard]", err.getvalue())
@@ -179,6 +214,7 @@ class DashboardOptionalDependencyTests(unittest.TestCase):
 class DotenvLoadingTests(unittest.TestCase):
     def setUp(self):
         from bangzen_prime.settings import load_settings_env, parse_env_file
+
         self.load_env, self.parse = load_settings_env, parse_env_file
         self._dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self._dir, ignore_errors=True)
@@ -189,10 +225,14 @@ class DotenvLoadingTests(unittest.TestCase):
             fh.write(text)
 
     def test_parses_bangzen_keys_and_ignores_comments_and_other_keys(self):
-        self._write("# c\nBANGZEN_LOG_LEVEL=WARNING\nexport BANGZEN_MAX_OPEN_POSITIONS=\"7\"\n"
-                    "OTHER_SECRET=nope\n\n")
-        self.assertEqual(self.parse(self.path), {"BANGZEN_LOG_LEVEL": "WARNING",
-                                                 "BANGZEN_MAX_OPEN_POSITIONS": "7"})
+        self._write(
+            '# c\nBANGZEN_LOG_LEVEL=WARNING\nexport BANGZEN_MAX_OPEN_POSITIONS="7"\n'
+            "OTHER_SECRET=nope\n\n"
+        )
+        self.assertEqual(
+            self.parse(self.path),
+            {"BANGZEN_LOG_LEVEL": "WARNING", "BANGZEN_MAX_OPEN_POSITIONS": "7"},
+        )
 
     def test_missing_file_means_no_overrides(self):
         self.assertEqual(self.parse(os.path.join(self._dir, "absent")), {})
@@ -219,25 +259,35 @@ class DotenvLoadingTests(unittest.TestCase):
 class EmergencyStopTests(unittest.TestCase):
     def test_cli_refuses_signal_producing_commands_when_kill_switch_is_on(self):
         from bangzen_prime.interfaces import cli
-        for command in (["scan", "So11111111111111111111111111111111111111112"], ["discover", "--once"], ["outbox"]):
+
+        for command in (
+            ["scan", "So11111111111111111111111111111111111111112"],
+            ["discover", "--once"],
+            ["outbox"],
+        ):
             with self.subTest(command=command[0]):
                 err = io.StringIO()
-                with mock.patch.dict(os.environ, {"BANGZEN_EMERGENCY_STOP": "true"}), \
-                        mock.patch("bangzen_prime.bootstrap.build_container") as build, \
-                        contextlib.redirect_stderr(err):
+                with (
+                    mock.patch.dict(os.environ, {"BANGZEN_EMERGENCY_STOP": "true"}),
+                    mock.patch("bangzen_prime.bootstrap.build_container") as build,
+                    contextlib.redirect_stderr(err),
+                ):
                     code = cli.main(command)
                 self.assertEqual(code, cli.EXIT_ERROR)
                 self.assertIn("emergency stop is active", err.getvalue())
                 build.assert_not_called()  # refused before any container or network is built
 
     def test_kill_switch_setting_reaches_settings(self):
-        self.assertTrue(Settings.from_env({"BANGZEN_EMERGENCY_STOP": "true"}).emergency_stop)
+        self.assertTrue(
+            Settings.from_env({"BANGZEN_EMERGENCY_STOP": "true"}).emergency_stop
+        )
         self.assertFalse(Settings.from_env({}).emergency_stop)
 
 
 class LogRedactionTests(unittest.TestCase):
     def test_api_key_in_websocket_error_text_is_redacted(self):
         from bangzen_prime.logging_utils import redact
+
         msg = "[!] Error WebSocket: InvalidStatus wss://mainnet.helius-rpc.com/?api-key=SECRET123ABC"
         out = redact(msg)
         self.assertNotIn("SECRET123ABC", out)
@@ -265,7 +315,9 @@ class DockerfileInvariantTests(unittest.TestCase):
         # pyproject.toml declares readme = "README.md"; the install step must have it.
         text = self._dockerfile()
         self.assertIn("COPY . ./", text)
-        self.assertLess(text.index("COPY . ./"), text.index("RUN pip install --no-cache-dir ."))
+        self.assertLess(
+            text.index("COPY . ./"), text.index("RUN pip install --no-cache-dir .")
+        )
 
 
 if __name__ == "__main__":

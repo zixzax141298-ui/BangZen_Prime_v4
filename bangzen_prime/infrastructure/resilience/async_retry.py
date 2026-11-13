@@ -89,9 +89,11 @@ async def async_retry(
                 raise
             delay = retry.delay_for(
                 attempt,
-                getattr(exc, "retry_after", None)
-                if isinstance(exc, ExternalServiceError)
-                else None,
+                (
+                    getattr(exc, "retry_after", None)
+                    if isinstance(exc, ExternalServiceError)
+                    else None
+                ),
             )
             logger.info(
                 "%s attempt %s failed (%s); retry in %.3fs",
@@ -143,8 +145,10 @@ async def async_retry_result(
                 )
             delay = retry.delay_for(
                 attempt,
-                getattr(exc, "retry_after", None)
-                if isinstance(exc, ExternalServiceError)
-                else None,
+                (
+                    getattr(exc, "retry_after", None)
+                    if isinstance(exc, ExternalServiceError)
+                    else None
+                ),
             )
             await sleep_fn(delay)

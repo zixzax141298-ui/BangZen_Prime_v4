@@ -8,7 +8,10 @@ from bangzen_prime.domain.shared import DomainEvent
 from bangzen_prime.domain.signals import PriceLevels, RejectReason, Signal, SignalStatus
 from bangzen_prime.domain.tokens import PairSnapshot, SafetyAssessment, Token
 from bangzen_prime.errors import PersistenceError
-from bangzen_prime.infrastructure.persistence.sqlite.database import Database, load_migrations
+from bangzen_prime.infrastructure.persistence.sqlite.database import (
+    Database,
+    load_migrations,
+)
 from bangzen_prime.infrastructure.persistence.sqlite.outbox import (
     GENESIS_HASH,
     AuditLog,
@@ -27,9 +30,17 @@ def fresh_db():
 
 def seed_token(uow):
     token = Token(chain="solana", mint=TOKEN_MINT, symbol="TEST")
-    pair = PairSnapshot.create(chain="solana", pair_address=PAIR_ADDRESS, dex_id="raydium",
-                               base_mint=TOKEN_MINT, base_symbol="TEST", price_usd="1.25",
-                               liquidity_usd="50000", volume_24h_usd="20000", observed_at=START)
+    pair = PairSnapshot.create(
+        chain="solana",
+        pair_address=PAIR_ADDRESS,
+        dex_id="raydium",
+        base_mint=TOKEN_MINT,
+        base_symbol="TEST",
+        price_usd="1.25",
+        liquidity_usd="50000",
+        volume_24h_usd="20000",
+        observed_at=START,
+    )
     with uow.begin() as repos:
         repos.tokens.upsert(token, START)
         repos.pairs.upsert(pair)
@@ -41,9 +52,24 @@ class MigrationTest(unittest.TestCase):
         db = Database(":memory:")
         self.assertEqual(db.migrate(), [1, 2, 3, 4, 5])
         self.assertEqual(db.migrate(), [])  # idempotent
-        names = {r["name"] for r in db.query_all("SELECT name FROM sqlite_master WHERE type='table'")}
-        self.assertTrue({"tokens", "pairs", "signals", "outbox", "audit_log", "orders",
-                         "ledger_entries", "token_lifecycle", "token_lifecycle_events"} <= names)
+        names = {
+            r["name"]
+            for r in db.query_all("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        self.assertTrue(
+            {
+                "tokens",
+                "pairs",
+                "signals",
+                "outbox",
+                "audit_log",
+                "orders",
+                "ledger_entries",
+                "token_lifecycle",
+                "token_lifecycle_events",
+            }
+            <= names
+        )
 
     def test_migrations_are_loaded_from_package_data(self):
         migrations = load_migrations()
@@ -52,29 +78,39 @@ class MigrationTest(unittest.TestCase):
 
     def test_schema_version_recorded(self):
         db = fresh_db()
-        self.assertEqual([r["version"] for r in db.query_all(
-            "SELECT version FROM schema_migrations ORDER BY version")], [1, 2, 3, 4, 5])
+        self.assertEqual(
+            [
+                r["version"]
+                for r in db.query_all(
+                    "SELECT version FROM schema_migrations ORDER BY version"
+                )
+            ],
+            [1, 2, 3, 4, 5],
+        )
 
 
 class TransactionTest(unittest.TestCase):
     def test_rollback_removes_all_writes_of_failed_unit_of_work(self):
         db = fresh_db()
         uow = UnitOfWork(db)
-        with self.assertRaises(RuntimeError):
-            with uow.begin() as repos:
-                token = Token(chain="solana", mint=TOKEN_MINT, symbol="T")
-                repos.tokens.upsert(token, START)
-                raise RuntimeError("boom mid-transaction")
+        with self.assertRaises(RuntimeError), uow.begin() as repos:
+            token = Token(chain="solana", mint=TOKEN_MINT, symbol="T")
+            repos.tokens.upsert(token, START)
+            raise RuntimeError("boom mid-transaction")
         self.assertIsNone(db.query_one("SELECT 1 FROM tokens"))
 
     def test_token_signal_and_outbox_commit_together(self):
         db = fresh_db()
         uow = UnitOfWork(db)
         token, pair = seed_token(uow)
-        signal = Signal.accept(token_id=token.id, pair_id=pair.pair_id, score=Decimal(60),
-                               confidence=Decimal("0.6"),
-                               levels=PriceLevels(Decimal("1.25"), Decimal("1.1"), Decimal("1.6")),
-                               created_at=START)
+        signal = Signal.accept(
+            token_id=token.id,
+            pair_id=pair.pair_id,
+            score=Decimal(60),
+            confidence=Decimal("0.6"),
+            levels=PriceLevels(Decimal("1.25"), Decimal("1.1"), Decimal("1.6")),
+            created_at=START,
+        )
         with uow.begin() as repos:
             repos.signals.add(signal)
             for event in signal.pull_events():
@@ -86,19 +122,25 @@ class TransactionTest(unittest.TestCase):
     def test_foreign_key_violation_rolls_back(self):
         db = fresh_db()
         uow = UnitOfWork(db)
-        signal = Signal.reject(token_id=uuid.uuid4(), pair_id=uuid.uuid4(), score=Decimal(0),
-                               reasons=(RejectReason.EMPTY_MARKET,), created_at=START)
-        with self.assertRaises(sqlite3.IntegrityError):
-            with uow.begin() as repos:
-                repos.signals.add(signal)
+        signal = Signal.reject(
+            token_id=uuid.uuid4(),
+            pair_id=uuid.uuid4(),
+            score=Decimal(0),
+            reasons=(RejectReason.EMPTY_MARKET,),
+            created_at=START,
+        )
+        with self.assertRaises(sqlite3.IntegrityError), uow.begin() as repos:
+            repos.signals.add(signal)
         self.assertEqual(db.query_one("SELECT COUNT(*) AS n FROM signals")["n"], 0)
 
     def test_check_constraint_blocks_accepted_without_levels(self):
         db = fresh_db()
         with self.assertRaises(sqlite3.IntegrityError):
             with db.transaction() as conn:
-                conn.execute("INSERT INTO signals (id, token_id, pair_id, status, score, reasons,"
-                             " created_at) VALUES ('x', 'a', 'b', 'ACCEPTED', '1', '[]', 'c')")
+                conn.execute(
+                    "INSERT INTO signals (id, token_id, pair_id, status, score, reasons,"
+                    " created_at) VALUES ('x', 'a', 'b', 'ACCEPTED', '1', '[]', 'c')"
+                )
 
 
 class RoundTripTest(unittest.TestCase):
@@ -107,8 +149,14 @@ class RoundTripTest(unittest.TestCase):
         uow = UnitOfWork(db)
         token, pair = seed_token(uow)
         levels = PriceLevels(Decimal("1.25"), Decimal("1.1"), Decimal("1.6"))
-        signal = Signal.accept(token_id=token.id, pair_id=pair.pair_id, score=Decimal("61.5"),
-                               confidence=Decimal("0.615"), levels=levels, created_at=START)
+        signal = Signal.accept(
+            token_id=token.id,
+            pair_id=pair.pair_id,
+            score=Decimal("61.5"),
+            confidence=Decimal("0.615"),
+            levels=levels,
+            created_at=START,
+        )
         with uow.begin() as repos:
             repos.signals.add(signal)
         with uow.begin() as repos:
@@ -123,14 +171,20 @@ class RoundTripTest(unittest.TestCase):
         db = fresh_db()
         uow = UnitOfWork(db)
         token, pair = seed_token(uow)
-        signal = Signal.reject(token_id=token.id, pair_id=pair.pair_id, score=Decimal(0),
-                               reasons=(RejectReason.RUGGED, RejectReason.LOW_LIQUIDITY),
-                               created_at=START)
+        signal = Signal.reject(
+            token_id=token.id,
+            pair_id=pair.pair_id,
+            score=Decimal(0),
+            reasons=(RejectReason.RUGGED, RejectReason.LOW_LIQUIDITY),
+            created_at=START,
+        )
         with uow.begin() as repos:
             repos.signals.add(signal)
         with uow.begin() as repos:
             loaded = repos.signals.get(signal.id)
-        self.assertEqual(loaded.reasons, (RejectReason.RUGGED, RejectReason.LOW_LIQUIDITY))
+        self.assertEqual(
+            loaded.reasons, (RejectReason.RUGGED, RejectReason.LOW_LIQUIDITY)
+        )
         self.assertIsNone(loaded.levels)
 
     def test_price_history_is_chronological_and_limited(self):
@@ -148,13 +202,21 @@ class RoundTripTest(unittest.TestCase):
         db = fresh_db()
         uow = UnitOfWork(db)
         token, pair = seed_token(uow)
-        assessment = SafetyAssessment.create(chain="solana", mint=TOKEN_MINT, risk_score="12",
-                                             rugged=False, source="rugcheck", checked_at=START)
+        assessment = SafetyAssessment.create(
+            chain="solana",
+            mint=TOKEN_MINT,
+            risk_score="12",
+            rugged=False,
+            source="rugcheck",
+            checked_at=START,
+        )
         with uow.begin() as repos:
             repos.safety.append(token.id, assessment)
             repos.pairs.upsert(pair)
         self.assertEqual(db.query_one("SELECT COUNT(*) AS n FROM pairs")["n"], 1)
-        self.assertEqual(db.query_one("SELECT COUNT(*) AS n FROM safety_checks")["n"], 1)
+        self.assertEqual(
+            db.query_one("SELECT COUNT(*) AS n FROM safety_checks")["n"], 1
+        )
 
 
 class AuditChainTest(unittest.TestCase):
@@ -189,8 +251,12 @@ class AuditChainTest(unittest.TestCase):
 
 
 def make_event(event_id=None, at=START):
-    return DomainEvent(name="SignalGenerated", payload={"n": 1}, occurred_at=at,
-                       event_id=event_id or str(uuid.uuid4()))
+    return DomainEvent(
+        name="SignalGenerated",
+        payload={"n": 1},
+        occurred_at=at,
+        event_id=event_id or str(uuid.uuid4()),
+    )
 
 
 class OutboxTest(unittest.TestCase):
@@ -229,14 +295,25 @@ class OutboxTest(unittest.TestCase):
         self.enqueue(db, make_event("r1"))
         self.claim(db, START)
         with db.transaction() as conn:
-            OutboxStore(conn).reschedule("r1", attempts=1, available_at=START + timedelta(minutes=1),
-                                         error="fail")
+            OutboxStore(conn).reschedule(
+                "r1",
+                attempts=1,
+                available_at=START + timedelta(minutes=1),
+                error="fail",
+            )
         self.assertEqual(self.claim(db, START), [])
-        self.assertEqual([r.id for r in self.claim(db, START + timedelta(minutes=1))], ["r1"])
+        self.assertEqual(
+            [r.id for r in self.claim(db, START + timedelta(minutes=1))], ["r1"]
+        )
         with db.transaction() as conn:
             OutboxStore(conn).dead_letter("r1", attempts=5, error="gave up")
-        row = db.query_one("SELECT status, attempts, last_error FROM outbox WHERE id = 'r1'")
-        self.assertEqual((row["status"], row["attempts"], row["last_error"]), ("FAILED", 5, "gave up"))
+        row = db.query_one(
+            "SELECT status, attempts, last_error FROM outbox WHERE id = 'r1'"
+        )
+        self.assertEqual(
+            (row["status"], row["attempts"], row["last_error"]),
+            ("FAILED", 5, "gave up"),
+        )
 
     def test_mark_sent_and_status_query(self):
         db = fresh_db()
@@ -260,8 +337,10 @@ class OutboxTest(unittest.TestCase):
         db = fresh_db()
         with self.assertRaises(sqlite3.IntegrityError):
             with db.transaction() as conn:
-                conn.execute("INSERT INTO outbox (id, event_name, payload, occurred_at, status,"
-                             " available_at) VALUES ('z', 'E', '{}', 'x', 'BOGUS', 'x')")
+                conn.execute(
+                    "INSERT INTO outbox (id, event_name, payload, occurred_at, status,"
+                    " available_at) VALUES ('z', 'E', '{}', 'x', 'BOGUS', 'x')"
+                )
 
 
 class DatabaseErrorTest(unittest.TestCase):

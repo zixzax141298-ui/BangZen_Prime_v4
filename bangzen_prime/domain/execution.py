@@ -27,9 +27,18 @@ class Quote:
     expires_at: datetime
 
     @classmethod
-    def create(cls, *, provider: str, input_mint: str, output_mint: str, in_amount: object,
-               out_amount: object, price_impact_pct: object, quoted_at: datetime,
-               expires_at: datetime) -> Quote:
+    def create(
+        cls,
+        *,
+        provider: str,
+        input_mint: str,
+        output_mint: str,
+        in_amount: object,
+        out_amount: object,
+        price_impact_pct: object,
+        quoted_at: datetime,
+        expires_at: datetime,
+    ) -> Quote:
         validate_mint(input_mint)
         validate_mint(output_mint)
         if input_mint == output_mint:
@@ -40,9 +49,16 @@ class Quote:
         expires = ensure_utc(expires_at)
         if expires <= quoted:
             raise DomainError("quote expiry must be after quote time")
-        return cls(provider.strip(), input_mint, output_mint, positive(in_amount, "in_amount"),
-                   positive(out_amount, "out_amount"), percent(price_impact_pct, "price_impact_pct"),
-                   quoted, expires)
+        return cls(
+            provider.strip(),
+            input_mint,
+            output_mint,
+            positive(in_amount, "in_amount"),
+            positive(out_amount, "out_amount"),
+            percent(price_impact_pct, "price_impact_pct"),
+            quoted,
+            expires,
+        )
 
     def is_expired(self, now: datetime) -> bool:
         return ensure_utc(now) >= self.expires_at
@@ -72,9 +88,16 @@ class PlannedTransaction:
 ALLOWED_PROVIDERS = frozenset({"jupiter-compatible"})
 
 
-def validate_quote(quote: Quote, *, now: datetime, expected_input: str, expected_output: str,
-                   expected_in_amount: Decimal, max_price_impact_pct: Decimal,
-                   allowed_providers: frozenset[str] = ALLOWED_PROVIDERS) -> list[str]:
+def validate_quote(
+    quote: Quote,
+    *,
+    now: datetime,
+    expected_input: str,
+    expected_output: str,
+    expected_in_amount: Decimal,
+    max_price_impact_pct: Decimal,
+    allowed_providers: frozenset[str] = ALLOWED_PROVIDERS,
+) -> list[str]:
     """Return reason codes. Empty list means the quote is usable."""
     reasons: list[str] = []
     if quote.provider not in allowed_providers:
@@ -90,9 +113,15 @@ def validate_quote(quote: Quote, *, now: datetime, expected_input: str, expected
     return reasons
 
 
-def inspect_plan(plan: PlannedTransaction, *, quote: Quote, owner: str,
-                 allowed_programs: frozenset[str], allowed_destinations: frozenset[str],
-                 now: datetime) -> list[str]:
+def inspect_plan(
+    plan: PlannedTransaction,
+    *,
+    quote: Quote,
+    owner: str,
+    allowed_programs: frozenset[str],
+    allowed_destinations: frozenset[str],
+    now: datetime,
+) -> list[str]:
     """Static checks on a planned transaction before any simulation. Empty list means pass."""
     reasons: list[str] = []
     if plan.provider != quote.provider:
@@ -107,14 +136,21 @@ def inspect_plan(plan: PlannedTransaction, *, quote: Quote, owner: str,
         reasons.append("FOREIGN_SOURCE")
     if any(t.destination not in allowed_destinations for t in plan.transfers):
         reasons.append("UNKNOWN_DESTINATION")
-    spent = sum((t.amount for t in plan.transfers if t.mint == quote.input_mint), Decimal(0))
+    spent = sum(
+        (t.amount for t in plan.transfers if t.mint == quote.input_mint), Decimal(0)
+    )
     if spent != quote.in_amount:
         reasons.append("TRANSFER_TOTAL_MISMATCH")
     return reasons
 
 
-def balance_delta_matches(*, before: Decimal, after: Decimal, expected_increase: Decimal,
-                          tolerance_pct: Decimal) -> bool:
+def balance_delta_matches(
+    *,
+    before: Decimal,
+    after: Decimal,
+    expected_increase: Decimal,
+    tolerance_pct: Decimal,
+) -> bool:
     """Check that an observed balance change matches the quoted output within a tolerance."""
     if expected_increase <= 0:
         raise DomainError("expected increase must be positive")

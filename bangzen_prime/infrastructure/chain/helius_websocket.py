@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
 
-
 _ADDRESS_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 _MAX_MESSAGE_BYTES = 1_048_576
 
@@ -75,7 +74,9 @@ class HeliusStreamGap:
 StreamItem = HeliusLogEvent | HeliusStreamGap
 
 
-def build_logs_subscribe_request(address: str, commitment: str = "confirmed") -> dict[str, Any]:
+def build_logs_subscribe_request(
+    address: str, commitment: str = "confirmed"
+) -> dict[str, Any]:
     if not isinstance(address, str) or not _ADDRESS_RE.fullmatch(address):
         raise ValueError("invalid Solana address for logsSubscribe")
     if commitment not in {"processed", "confirmed", "finalized"}:

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import UTC, datetime
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
@@ -92,7 +92,9 @@ class ContinuousDiscoveryUseCase:
             try:
                 unique.append(validate_mint(candidate))
             except DomainError:
-                logger.warning("discovery feed returned an invalid Solana mint; candidate skipped")
+                logger.warning(
+                    "discovery feed returned an invalid Solana mint; candidate skipped"
+                )
 
         if self._lifecycle_registry is not None and unique:
             observed_at = self._wall_clock()
@@ -123,7 +125,9 @@ class ContinuousDiscoveryUseCase:
 
         logger.info(
             "discovery cycle complete: discovered=%d scanned=%d skipped_recent=%d",
-            len(unique), len(results), len(unique) - len(fresh),
+            len(unique),
+            len(results),
+            len(unique) - len(fresh),
         )
         return DiscoveryCycle(
             discovered=len(unique),

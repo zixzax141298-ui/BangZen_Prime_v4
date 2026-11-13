@@ -7,6 +7,7 @@ derives target-token units per one quote-token unit using Decimal arithmetic.
 Price API output is a reference/last-swap heuristic, not an executable fill price.
 Use Jupiter Swap API quotes for amount-specific execution economics.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,7 +18,11 @@ from urllib.parse import quote
 from bangzen_prime.domain.quote_economics import VerifiedQuotePrice
 from bangzen_prime.domain.tokens import validate_mint
 from bangzen_prime.errors import DomainError
-from bangzen_prime.infrastructure.http import HttpRequest, RequestTransport, request_json
+from bangzen_prime.infrastructure.http import (
+    HttpRequest,
+    RequestTransport,
+    request_json,
+)
 from bangzen_prime.infrastructure.resilience.policies import ResilientCaller
 
 BASE_URL = "https://api.jup.ag/price/v3"
@@ -63,11 +68,19 @@ class JupiterPriceEvidenceAdapter:
     ) -> None:
         if not isinstance(api_key, str) or not api_key.strip():
             raise DomainError("Jupiter API key is required")
-        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or timeout <= 0
+        ):
             raise DomainError("timeout must be positive")
         if not callable(current_slot) or not callable(clock):
             raise DomainError("current_slot and clock callables are required")
-        if isinstance(max_slot_lag, bool) or not isinstance(max_slot_lag, int) or max_slot_lag < 0:
+        if (
+            isinstance(max_slot_lag, bool)
+            or not isinstance(max_slot_lag, int)
+            or max_slot_lag < 0
+        ):
             raise DomainError("max_slot_lag must be a non-negative integer")
         self._api_key = api_key.strip()
         self._transport = transport
@@ -78,11 +91,15 @@ class JupiterPriceEvidenceAdapter:
         self._max_slot_lag = max_slot_lag
         self._base = base_url.rstrip("/")
 
-    def fetch_quote_price(self, *, mint: str, quote_mint: str) -> JupiterPriceObservation:
+    def fetch_quote_price(
+        self, *, mint: str, quote_mint: str
+    ) -> JupiterPriceObservation:
         validate_mint(mint)
         validate_mint(quote_mint)
         if mint == quote_mint:
-            raise DomainError("price conversion mints must differ; same-mint uses identity")
+            raise DomainError(
+                "price conversion mints must differ; same-mint uses identity"
+            )
         # URL-encode only the comma separator and validated base58 addresses.
         ids = quote(mint, safe="") + "%2C" + quote(quote_mint, safe="")
         request = HttpRequest(
@@ -93,22 +110,26 @@ class JupiterPriceEvidenceAdapter:
             self._timeout,
         )
         payload = self._caller.call(
-            lambda: request_json(service=SERVICE, request=request, transport=self._transport)
+            lambda: request_json(
+                service=SERVICE, request=request, transport=self._transport
+            )
         )
         now = self._clock()
         current = self._current_slot()
         if isinstance(current, bool) or not isinstance(current, int) or current < 0:
             raise DomainError("current Solana slot is invalid")
-        if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
+        if (
+            not isinstance(now, datetime)
+            or now.tzinfo is None
+            or now.utcoffset() is None
+        ):
             raise DomainError("clock must return a timezone-aware datetime")
         target = self._parse_price(payload, mint, current)
         quote_price = self._parse_price(payload, quote_mint, current)
         with localcontext() as context:
             context.prec = 50
             rate = target.usd_price / quote_price.usd_price
-        source_id = (
-            f"{mint}:{target.block_slot}|{quote_mint}:{quote_price.block_slot}"
-        )
+        source_id = f"{mint}:{target.block_slot}|{quote_mint}:{quote_price.block_slot}"
         evidence = VerifiedQuotePrice(
             mint=mint,
             quote_mint=quote_mint,

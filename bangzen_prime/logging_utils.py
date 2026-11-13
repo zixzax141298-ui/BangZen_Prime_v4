@@ -40,7 +40,9 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False)
 
 
-def configure_logging(level: str = "INFO", stream: TextIO | None = None) -> logging.Logger:
+def configure_logging(
+    level: str = "INFO", stream: TextIO | None = None
+) -> logging.Logger:
     logger = logging.getLogger("bangzen_prime")
     logger.setLevel(level)
     logger.handlers.clear()

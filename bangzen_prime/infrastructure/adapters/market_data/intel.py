@@ -10,19 +10,25 @@ whose required fields are missing or non-numeric (fail closed).
 
 from __future__ import annotations
 
-from urllib.parse import quote
-
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-import threading
 from typing import Any
+from urllib.parse import quote
 
 from bangzen_prime.domain.tokens import validate_chain, validate_mint
 from bangzen_prime.errors import DomainError
-from bangzen_prime.infrastructure.adapters.market_data.parsing import MalformedData, to_decimal
-from bangzen_prime.infrastructure.http import HttpRequest, RequestTransport, request_json
+from bangzen_prime.infrastructure.adapters.market_data.parsing import (
+    MalformedData,
+    to_decimal,
+)
+from bangzen_prime.infrastructure.http import (
+    HttpRequest,
+    RequestTransport,
+    request_json,
+)
 from bangzen_prime.infrastructure.resilience.policies import ResilientCaller
 
 BIRDEYE_BASE = "https://public-api.birdeye.so"
@@ -61,8 +67,16 @@ def _data(payload: Any, service: str) -> dict:
 class BirdeyeAdapter:
     SERVICE = "birdeye"
 
-    def __init__(self, *, api_key: str, transport: RequestTransport, caller: ResilientCaller,
-                 timeout: float, clock: Callable[[], datetime], base_url: str = BIRDEYE_BASE) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        transport: RequestTransport,
+        caller: ResilientCaller,
+        timeout: float,
+        clock: Callable[[], datetime],
+        base_url: str = BIRDEYE_BASE,
+    ) -> None:
         if not api_key:
             raise DomainError("Birdeye API key is required")
         self._key = api_key
@@ -75,28 +89,51 @@ class BirdeyeAdapter:
     def token_intel(self, chain: str, mint: str) -> TokenIntel:
         validate_chain(chain)
         validate_mint(mint)
-        request = HttpRequest("GET", f"{self._base}/defi/token_overview?address={quote(mint, safe='')}",
-                              {"X-API-KEY": self._key, "x-chain": chain, "accept": "application/json"},
-                              None, self._timeout)
-        payload = self._caller.call(lambda: request_json(service=self.SERVICE, request=request,
-                                                         transport=self._transport))
+        request = HttpRequest(
+            "GET",
+            f"{self._base}/defi/token_overview?address={quote(mint, safe='')}",
+            {"X-API-KEY": self._key, "x-chain": chain, "accept": "application/json"},
+            None,
+            self._timeout,
+        )
+        payload = self._caller.call(
+            lambda: request_json(
+                service=self.SERVICE, request=request, transport=self._transport
+            )
+        )
         data = _data(payload, self.SERVICE)
         symbol = str(data.get("symbol") or "UNKNOWN")[:32]
         return TokenIntel(
-            mint=mint, symbol=symbol,
-            liquidity_usd=to_decimal(data.get("liquidity"), service=self.SERVICE, field="liquidity"),
-            volume_24h_usd=to_decimal(data.get("v24hUSD"), service=self.SERVICE, field="v24hUSD"),
-            price_usd=to_decimal(data.get("price"), service=self.SERVICE, field="price"),
-            source=self.SERVICE, observed_at=self._clock(),
+            mint=mint,
+            symbol=symbol,
+            liquidity_usd=to_decimal(
+                data.get("liquidity"), service=self.SERVICE, field="liquidity"
+            ),
+            volume_24h_usd=to_decimal(
+                data.get("v24hUSD"), service=self.SERVICE, field="v24hUSD"
+            ),
+            price_usd=to_decimal(
+                data.get("price"), service=self.SERVICE, field="price"
+            ),
+            source=self.SERVICE,
+            observed_at=self._clock(),
         )
 
 
 class SolanaTrackerAdapter:
     SERVICE = "solana_tracker"
 
-    def __init__(self, *, api_key: str, transport: RequestTransport, caller: ResilientCaller,
-                 timeout: float, clock: Callable[[], datetime],
-                 base_url: str = SOLANA_TRACKER_BASE, cache_ttl_seconds: int = 300) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        transport: RequestTransport,
+        caller: ResilientCaller,
+        timeout: float,
+        clock: Callable[[], datetime],
+        base_url: str = SOLANA_TRACKER_BASE,
+        cache_ttl_seconds: int = 300,
+    ) -> None:
         if not api_key:
             raise DomainError("Solana Tracker API key is required")
         self._key = api_key
@@ -112,11 +149,18 @@ class SolanaTrackerAdapter:
         self._cache_lock = threading.Lock()
 
     def _get(self, path: str) -> Any:
-        request = HttpRequest("GET", f"{self._base}{path}", {"x-api-key": self._key,
-                                                             "accept": "application/json"},
-                              None, self._timeout)
-        return self._caller.call(lambda: request_json(service=self.SERVICE, request=request,
-                                                      transport=self._transport))
+        request = HttpRequest(
+            "GET",
+            f"{self._base}{path}",
+            {"x-api-key": self._key, "accept": "application/json"},
+            None,
+            self._timeout,
+        )
+        return self._caller.call(
+            lambda: request_json(
+                service=self.SERVICE, request=request, transport=self._transport
+            )
+        )
 
     def holder_profile(self, chain: str, mint: str) -> HolderProfile:
         validate_chain(chain)

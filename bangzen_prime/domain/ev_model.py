@@ -51,10 +51,10 @@ def calculate_ev_model(
     stop, costs, first_target, first_sell_pct, second_target, buffer = _ev_inputs(
         sl_pct, cost_pct, tp1_pct, tp1_sell_pct, tp2_pct, breakeven_buffer
     )
-    s1 = first_sell_pct / Decimal("100")
+    s1 = first_sell_pct / Decimal(100)
     g_sl = -stop
-    g_be = (s1 * first_target) + ((Decimal("1") - s1) * buffer)
-    g_tp2 = (s1 * first_target) + ((Decimal("1") - s1) * second_target)
+    g_be = (s1 * first_target) + ((Decimal(1) - s1) * buffer)
+    g_tp2 = (s1 * first_target) + ((Decimal(1) - s1) * second_target)
 
     denom1 = stop + first_target
     p1_rand = stop / denom1
@@ -64,13 +64,13 @@ def calculate_ev_model(
     denom2 = d + u
     q_rand = d / denom2
 
-    w = ((Decimal("1") - q_rand) * g_be) + (q_rand * g_tp2)
+    w = ((Decimal(1) - q_rand) * g_be) + (q_rand * g_tp2)
 
     denom3 = w + stop
-    p1_be = (stop + costs) / denom3 if denom3 > 0 else Decimal("1")
-    p1_be = min(p1_be, Decimal("1"))
+    p1_be = (stop + costs) / denom3 if denom3 > 0 else Decimal(1)
+    p1_be = min(p1_be, Decimal(1))
 
-    ev_random_net = ((Decimal("1") - p1_rand) * g_sl) + (p1_rand * w) - costs
+    ev_random_net = ((Decimal(1) - p1_rand) * g_sl) + (p1_rand * w) - costs
 
     return {
         "p1_random": round(p1_rand, 4),
@@ -93,21 +93,25 @@ def validate_trade_plan(
     costs = non_negative(cost_pct, "cost_pct")
     minimum_rr = positive(min_net_rr, "min_net_rr")
     if not stop_value < entry_value < target_value:
-        return TradePlanValidation(False, "INVALID_LEVELS", Decimal("0"), Decimal("0"))
+        return TradePlanValidation(False, "INVALID_LEVELS", Decimal(0), Decimal(0))
 
-    sl_pct = ((entry_value - stop_value) / entry_value) * Decimal("100")
-    tp_pct = ((target_value - entry_value) / entry_value) * Decimal("100")
+    sl_pct = ((entry_value - stop_value) / entry_value) * Decimal(100)
+    tp_pct = ((target_value - entry_value) / entry_value) * Decimal(100)
 
     net_profit = tp_pct - costs
     net_loss = sl_pct + costs
     if net_profit <= 0:
-        return TradePlanValidation(False, "NON_POSITIVE_NET_PROFIT", Decimal("0"), Decimal("0"))
+        return TradePlanValidation(
+            False, "NON_POSITIVE_NET_PROFIT", Decimal(0), Decimal(0)
+        )
     if net_loss <= 0:
-        return TradePlanValidation(False, "INVALID_LOSS", Decimal("0"), Decimal("0"))
+        return TradePlanValidation(False, "INVALID_LOSS", Decimal(0), Decimal(0))
 
     net_rr = net_profit / net_loss
     if net_rr < minimum_rr:
-        return TradePlanValidation(False, f"NET_RR_TOO_LOW_{net_rr:.2f}", net_rr, Decimal("0"))
+        return TradePlanValidation(
+            False, f"NET_RR_TOO_LOW_{net_rr:.2f}", net_rr, Decimal(0)
+        )
 
     ev_data = calculate_ev_model(sl_pct, costs, tp1_pct=tp_pct)
     ev_net = ev_data["ev_random_net"]

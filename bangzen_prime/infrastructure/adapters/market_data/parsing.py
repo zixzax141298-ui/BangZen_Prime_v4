@@ -11,8 +11,11 @@ from bangzen_prime.errors import ExternalServiceError
 
 class MalformedData(ExternalServiceError):
     def __init__(self, service: str, detail: str) -> None:
-        super().__init__(f"{service} returned malformed data: {detail}", service=service,
-                         retryable=False)
+        super().__init__(
+            f"{service} returned malformed data: {detail}",
+            service=service,
+            retryable=False,
+        )
 
 
 def to_decimal(value: Any, *, service: str, field: str) -> Decimal:

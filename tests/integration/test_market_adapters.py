@@ -3,7 +3,9 @@ from datetime import timedelta
 from decimal import Decimal
 
 from bangzen_prime.errors import ExternalServiceError
-from bangzen_prime.infrastructure.adapters.market_data.dexscreener import DexScreenerAdapter
+from bangzen_prime.infrastructure.adapters.market_data.dexscreener import (
+    DexScreenerAdapter,
+)
 from bangzen_prime.infrastructure.adapters.market_data.intel import SolanaTrackerAdapter
 from bangzen_prime.infrastructure.adapters.market_data.rugcheck import RugCheckAdapter
 from bangzen_prime.infrastructure.http import HttpResponse, TransportTimeout
@@ -15,17 +17,30 @@ from bangzen_prime.infrastructure.resilience.policies import (
     RetryPolicy,
     TokenBucket,
 )
-from tests.support import PAIR_ADDRESS, START, TOKEN_MINT, RecordingTransport, json_response, pair_payload, safety_payload
+from tests.support import (
+    PAIR_ADDRESS,
+    START,
+    TOKEN_MINT,
+    RecordingTransport,
+    json_response,
+    pair_payload,
+    safety_payload,
+)
 
 BASE = "https://api.dexscreener.com"
 RC_BASE = "https://api.rugcheck.xyz/v1"
 
 
 def make_caller(clock, sleeps):
-    return ResilientCaller("svc", retry=RetryPolicy(max_attempts=3, base_delay_seconds=0.0),
-                           limiter=TokenBucket(rate_per_minute=6000, clock=clock),
-                           breaker=CircuitBreaker("svc", clock=clock), health=HealthMonitor(),
-                           sleep=sleeps.append, clock=clock)
+    return ResilientCaller(
+        "svc",
+        retry=RetryPolicy(max_attempts=3, base_delay_seconds=0.0),
+        limiter=TokenBucket(rate_per_minute=6000, clock=clock),
+        breaker=CircuitBreaker("svc", clock=clock),
+        health=HealthMonitor(),
+        sleep=sleeps.append,
+        clock=clock,
+    )
 
 
 class DexScreenerTest(unittest.TestCase):
@@ -33,18 +48,26 @@ class DexScreenerTest(unittest.TestCase):
         clock = clock or FakeClock(START)
         sleeps = []
         transport = RecordingTransport(handler)
-        adapter = DexScreenerAdapter(base_url=BASE, transport=transport,
-                                     caller=make_caller(clock, sleeps), timeout=5,
-                                     clock=clock.now)
+        adapter = DexScreenerAdapter(
+            base_url=BASE,
+            transport=transport,
+            caller=make_caller(clock, sleeps),
+            timeout=5,
+            clock=clock.now,
+        )
         return adapter, transport, sleeps
 
     def test_valid_response_yields_snapshot_with_decimal_price(self):
-        adapter, transport, _ = self.adapter(lambda url: json_response([pair_payload(price="0.0012")]))
+        adapter, transport, _ = self.adapter(
+            lambda url: json_response([pair_payload(price="0.0012")])
+        )
         pairs = adapter.fetch_pairs("solana", TOKEN_MINT)
         self.assertEqual(len(pairs), 1)
         self.assertEqual(pairs[0].price_usd, Decimal("0.0012"))
         self.assertEqual(pairs[0].pair_address, PAIR_ADDRESS)
-        self.assertEqual(transport.calls, [f"{BASE}/token-pairs/v1/solana/{TOKEN_MINT}"])
+        self.assertEqual(
+            transport.calls, [f"{BASE}/token-pairs/v1/solana/{TOKEN_MINT}"]
+        )
 
     def test_pair_creation_timestamp_is_parsed_from_milliseconds(self):
         payload = pair_payload()
@@ -72,7 +95,9 @@ class DexScreenerTest(unittest.TestCase):
         other_chain = pair_payload(chain="ethereum")
         other_token = pair_payload(mint="So11111111111111111111111111111111111111112")
         good = pair_payload()
-        adapter, _, _ = self.adapter(lambda url: json_response([other_chain, other_token, good]))
+        adapter, _, _ = self.adapter(
+            lambda url: json_response([other_chain, other_token, good])
+        )
         self.assertEqual(len(adapter.fetch_pairs("solana", TOKEN_MINT)), 1)
 
     def test_nan_and_infinite_values_are_skipped(self):
@@ -81,11 +106,15 @@ class DexScreenerTest(unittest.TestCase):
         bad_float = pair_payload()
         bad_float["priceUsd"] = None
         good = pair_payload()
-        adapter, _, _ = self.adapter(lambda url: json_response([nan_price, inf_liq, bad_float, good]))
+        adapter, _, _ = self.adapter(
+            lambda url: json_response([nan_price, inf_liq, bad_float, good])
+        )
         self.assertEqual(len(adapter.fetch_pairs("solana", TOKEN_MINT)), 1)
 
     def test_zero_price_entry_is_skipped_not_fatal(self):
-        adapter, _, _ = self.adapter(lambda url: json_response([pair_payload(price="0"), pair_payload()]))
+        adapter, _, _ = self.adapter(
+            lambda url: json_response([pair_payload(price="0"), pair_payload()])
+        )
         self.assertEqual(len(adapter.fetch_pairs("solana", TOKEN_MINT)), 1)
 
     def test_missing_pair_address_is_skipped(self):
@@ -102,7 +131,10 @@ class DexScreenerTest(unittest.TestCase):
         self.assertEqual(len(transport.calls), 3)
 
     def test_429_retried_with_retry_after_then_success(self):
-        responses = [HttpResponse(429, b"", {"Retry-After": "2"}), json_response([pair_payload()])]
+        responses = [
+            HttpResponse(429, b"", {"Retry-After": "2"}),
+            json_response([pair_payload()]),
+        ]
         adapter, transport, sleeps = self.adapter(lambda url: responses.pop(0))
         self.assertEqual(len(adapter.fetch_pairs("solana", TOKEN_MINT)), 1)
         self.assertEqual(len(transport.calls), 2)
@@ -123,7 +155,9 @@ class DexScreenerTest(unittest.TestCase):
 
     def test_stale_observation_timestamp_comes_from_injected_clock(self):
         clock = FakeClock(START)
-        adapter, _, _ = self.adapter(lambda url: json_response([pair_payload()]), clock=clock)
+        adapter, _, _ = self.adapter(
+            lambda url: json_response([pair_payload()]), clock=clock
+        )
         clock.advance(60)
         pairs = adapter.fetch_pairs("solana", TOKEN_MINT)
         self.assertEqual(pairs[0].observed_at, START + timedelta(seconds=60))
@@ -134,15 +168,27 @@ class RugCheckTest(unittest.TestCase):
         clock = FakeClock(START)
         sleeps = []
         transport = RecordingTransport(handler)
-        return RugCheckAdapter(base_url=RC_BASE, transport=transport,
-                               caller=make_caller(clock, sleeps), timeout=5, clock=clock.now), transport
+        return (
+            RugCheckAdapter(
+                base_url=RC_BASE,
+                transport=transport,
+                caller=make_caller(clock, sleeps),
+                timeout=5,
+                clock=clock.now,
+            ),
+            transport,
+        )
 
     def test_valid_summary_normalised(self):
-        adapter, transport = self.adapter(lambda url: json_response(safety_payload(score=35)))
+        adapter, transport = self.adapter(
+            lambda url: json_response(safety_payload(score=35))
+        )
         assessment = adapter.fetch_safety("solana", TOKEN_MINT)
-        self.assertEqual(assessment.risk_score, Decimal("35"))
+        self.assertEqual(assessment.risk_score, Decimal(35))
         self.assertFalse(assessment.rugged)
-        self.assertEqual(transport.calls, [f"{RC_BASE}/tokens/{TOKEN_MINT}/report/summary"])
+        self.assertEqual(
+            transport.calls, [f"{RC_BASE}/tokens/{TOKEN_MINT}/report/summary"]
+        )
 
     def test_missing_score_is_malformed(self):
         adapter, _ = self.adapter(lambda url: json_response({"risks": []}))
@@ -156,27 +202,39 @@ class RugCheckTest(unittest.TestCase):
             adapter.fetch_safety("solana", TOKEN_MINT)
 
     def test_nan_score_is_rejected(self):
-        adapter, _ = self.adapter(lambda url: json_response({"score_normalised": float("nan")}))
+        adapter, _ = self.adapter(
+            lambda url: json_response({"score_normalised": float("nan")})
+        )
         with self.assertRaises(ExternalServiceError):
             adapter.fetch_safety("solana", TOKEN_MINT)
 
     def test_rugged_flag_true_is_honoured(self):
-        adapter, _ = self.adapter(lambda url: json_response(safety_payload(score=90, rugged=True)))
+        adapter, _ = self.adapter(
+            lambda url: json_response(safety_payload(score=90, rugged=True))
+        )
         self.assertTrue(adapter.fetch_safety("solana", TOKEN_MINT).rugged)
 
     def test_rugged_risk_entry_marks_rugged(self):
         risks = [{"name": "Rugged", "level": "danger", "score": 20000}]
-        adapter, _ = self.adapter(lambda url: json_response(safety_payload(score=99, risks=risks)))
+        adapter, _ = self.adapter(
+            lambda url: json_response(safety_payload(score=99, risks=risks))
+        )
         self.assertTrue(adapter.fetch_safety("solana", TOKEN_MINT).rugged)
 
     def test_non_bool_rugged_is_malformed(self):
-        adapter, _ = self.adapter(lambda url: json_response({"score_normalised": 1, "rugged": "yes"}))
+        adapter, _ = self.adapter(
+            lambda url: json_response({"score_normalised": 1, "rugged": "yes"})
+        )
         with self.assertRaises(ExternalServiceError):
             adapter.fetch_safety("solana", TOKEN_MINT)
 
     def test_raw_score_field_is_never_used(self):
-        adapter, _ = self.adapter(lambda url: json_response({"score": 20000, "score_normalised": 12}))
-        self.assertEqual(adapter.fetch_safety("solana", TOKEN_MINT).risk_score, Decimal("12"))
+        adapter, _ = self.adapter(
+            lambda url: json_response({"score": 20000, "score_normalised": 12})
+        )
+        self.assertEqual(
+            adapter.fetch_safety("solana", TOKEN_MINT).risk_score, Decimal(12)
+        )
 
     def test_server_error_is_retryable_and_exhausts(self):
         adapter, transport = self.adapter(lambda url: HttpResponse(503, b"", {}))
@@ -184,7 +242,6 @@ class RugCheckTest(unittest.TestCase):
             adapter.fetch_safety("solana", TOKEN_MINT)
         self.assertTrue(ctx.exception.retryable)
         self.assertEqual(len(transport.calls), 3)
-
 
 
 class SolanaTrackerHolderEvidenceTest(unittest.TestCase):
@@ -204,7 +261,7 @@ class SolanaTrackerHolderEvidenceTest(unittest.TestCase):
 
     def test_holder_profile_extracts_only_valid_wallet_addresses_ranked_by_amount(self):
         accounts = [
-            {"owner": "Vote111111111111111111111111111111111111111","amount": "10"},
+            {"owner": "Vote111111111111111111111111111111111111111", "amount": "10"},
             {"address": "11111111111111111111111111111111", "amount": "30"},
             {"wallet": "So11111111111111111111111111111111111111112", "amount": "20"},
             {"owner": "not-a-solana-address", "amount": "100"},
@@ -228,15 +285,19 @@ class SolanaTrackerHolderEvidenceTest(unittest.TestCase):
             [f"{self.BASE}/tokens/{TOKEN_MINT}/holders"],
         )
 
-    def test_holder_profile_without_recognized_wallet_fields_has_no_sybil_addresses(self):
-        adapter, _ = self.adapter({
-            "total": 3,
-            "accounts": [
-                {"amount": "3"},
-                {"amount": "2"},
-                {"amount": "1"},
-            ],
-        })
+    def test_holder_profile_without_recognized_wallet_fields_has_no_sybil_addresses(
+        self,
+    ):
+        adapter, _ = self.adapter(
+            {
+                "total": 3,
+                "accounts": [
+                    {"amount": "3"},
+                    {"amount": "2"},
+                    {"amount": "1"},
+                ],
+            }
+        )
 
         profile = adapter.holder_profile("solana", TOKEN_MINT)
 

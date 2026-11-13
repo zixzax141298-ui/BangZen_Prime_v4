@@ -29,7 +29,9 @@ class HeartbeatRegistry:
 
 
 class EmergencyLatch:
-    def __init__(self, audit: Callable[[str, dict, datetime], None] | None = None) -> None:
+    def __init__(
+        self, audit: Callable[[str, dict, datetime], None] | None = None
+    ) -> None:
         self._active = False
         self._reason: str | None = None
         self._audit = audit or (lambda event, payload, at: None)
@@ -63,12 +65,22 @@ class EmergencyLatch:
             self._active = False
             self._reason = None
         if was_active:
-            self._audit("EmergencyStopReset", {"operator": operator.strip()[:64]}, ensure_utc(at))
+            self._audit(
+                "EmergencyStopReset",
+                {"operator": operator.strip()[:64]},
+                ensure_utc(at),
+            )
 
 
 class Watchdog:
-    def __init__(self, *, registry: HeartbeatRegistry, expected: tuple[str, ...], timeout: timedelta,
-                 latch: EmergencyLatch) -> None:
+    def __init__(
+        self,
+        *,
+        registry: HeartbeatRegistry,
+        expected: tuple[str, ...],
+        timeout: timedelta,
+        latch: EmergencyLatch,
+    ) -> None:
         if timeout <= timedelta(0):
             raise ValueError("watchdog timeout must be positive")
         self._registry = registry

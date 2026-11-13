@@ -17,7 +17,9 @@ class RedactionTest(unittest.TestCase):
         self.assertEqual(redact("password: hunter2,"), "password: <redacted>,")
 
     def test_plain_text_untouched(self):
-        self.assertEqual(redact("entry 0.001 liquidity 10000"), "entry 0.001 liquidity 10000")
+        self.assertEqual(
+            redact("entry 0.001 liquidity 10000"), "entry 0.001 liquidity 10000"
+        )
 
     def test_json_logger_never_emits_secret(self):
         stream = io.StringIO()
@@ -29,7 +31,9 @@ class RedactionTest(unittest.TestCase):
         self.assertNotIn("supersecretvalue", line)
 
     def test_filter_clears_args(self):
-        record = logging.LogRecord("x", logging.INFO, __file__, 1, "value %s", ("secret=abc",), None)
+        record = logging.LogRecord(
+            "x", logging.INFO, __file__, 1, "value %s", ("secret=abc",), None
+        )
         self.assertTrue(RedactionFilter().filter(record))
         self.assertEqual(record.args, ())
         self.assertNotIn("abc", record.msg)

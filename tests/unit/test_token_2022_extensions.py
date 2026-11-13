@@ -114,9 +114,12 @@ class HeliusToken2022ExtensionReaderTests(unittest.TestCase):
             calls.append(mint)
             return payload
 
-        return HeliusToken2022ExtensionReader(
-            account_info=account_info, clock=lambda: NOW
-        ), calls
+        return (
+            HeliusToken2022ExtensionReader(
+                account_info=account_info, clock=lambda: NOW
+            ),
+            calls,
+        )
 
     def test_reads_finalized_token_2022_extension_evidence(self):
         reader, calls = self.reader(rpc_result())
@@ -128,9 +131,7 @@ class HeliusToken2022ExtensionReaderTests(unittest.TestCase):
         self.assertEqual(evidence.slot, 900)
         self.assertEqual(evidence.source_record_id, f"{SOL_MINT}:900:234")
         self.assertEqual(evidence.configuration.validation_status, VERIFIED)
-        self.assertEqual(
-            evidence.configuration.configurations[0].name, "TRANSFER_HOOK"
-        )
+        self.assertEqual(evidence.configuration.configurations[0].name, "TRANSFER_HOOK")
         self.assertNotIn("SAFE", evidence.validation_status)
 
     def test_known_but_unsupported_extension_keeps_configuration_partial(self):
@@ -146,7 +147,9 @@ class HeliusToken2022ExtensionReaderTests(unittest.TestCase):
         self.assertEqual(evidence.validation_status, PARTIAL)
         self.assertEqual(evidence.unknown_extension_ids, (65000,))
 
-    def test_confirmed_classic_spl_mint_is_identified_without_token2022_extensions(self):
+    def test_confirmed_classic_spl_mint_is_identified_without_token2022_extensions(
+        self,
+    ):
         reader, _ = self.reader(rpc_result(classic_mint_data(), owner=TOKEN_PROGRAM))
         evidence = reader.read(SOL_MINT)
         self.assertEqual(evidence.validation_status, REJECTED)
@@ -161,7 +164,9 @@ class HeliusToken2022ExtensionReaderTests(unittest.TestCase):
         self.assertEqual(evidence.reason_codes, ("TOKEN_PROGRAM_ACCOUNT_NOT_MINT",))
 
     def test_uninitialized_classic_mint_is_rejected(self):
-        reader, _ = self.reader(rpc_result(classic_mint_data(initialized=0), owner=TOKEN_PROGRAM))
+        reader, _ = self.reader(
+            rpc_result(classic_mint_data(initialized=0), owner=TOKEN_PROGRAM)
+        )
         evidence = reader.read(SOL_MINT)
         self.assertEqual(evidence.validation_status, REJECTED)
         self.assertEqual(evidence.reason_codes, ("MINT_NOT_INITIALIZED",))

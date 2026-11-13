@@ -56,6 +56,7 @@ class ContinuousDiscoveryTest(unittest.TestCase):
 
     def test_discovery_persists_each_unique_candidate_as_discovered(self):
         from datetime import UTC, datetime
+
         from bangzen_prime.domain.lifecycle import LifecyclePhase
 
         registry = FakeLifecycleRegistry()

@@ -25,11 +25,25 @@ def setup_db(path=":memory:"):
     db.migrate()
     uow = UnitOfWork(db)
     token = Token(chain="solana", mint=TOKEN_MINT, symbol="T")
-    pair = PairSnapshot.create(chain="solana", pair_address=PAIR_ADDRESS, dex_id="raydium",
-                               base_mint=TOKEN_MINT, base_symbol="T", price_usd="2",
-                               liquidity_usd="50000", volume_24h_usd="1", observed_at=START)
-    signal = Signal.accept(token_id=token.id, pair_id=pair.pair_id, score=D(60),
-                           confidence=D("0.6"), levels=LEVELS, created_at=START)
+    pair = PairSnapshot.create(
+        chain="solana",
+        pair_address=PAIR_ADDRESS,
+        dex_id="raydium",
+        base_mint=TOKEN_MINT,
+        base_symbol="T",
+        price_usd="2",
+        liquidity_usd="50000",
+        volume_24h_usd="1",
+        observed_at=START,
+    )
+    signal = Signal.accept(
+        token_id=token.id,
+        pair_id=pair.pair_id,
+        score=D(60),
+        confidence=D("0.6"),
+        levels=LEVELS,
+        created_at=START,
+    )
     with uow.begin() as repos:
         repos.tokens.upsert(token, START)
         repos.pairs.upsert(pair)
@@ -37,21 +51,39 @@ def setup_db(path=":memory:"):
     return db, token, signal
 
 
-def execution(db, faults=None, clock=None, fee="0.001", slip="0.005", paper=True, dry=True):
-    return SimulatedExecution(db=db, fee_rate=D(fee), slippage_rate=D(slip),
-                              clock=(clock or clock_at(0)).now, paper=paper, dry_run=dry,
-                              faults=faults)
+def execution(
+    db, faults=None, clock=None, fee="0.001", slip="0.005", paper=True, dry=True
+):
+    return SimulatedExecution(
+        db=db,
+        fee_rate=D(fee),
+        slippage_rate=D(slip),
+        clock=(clock or clock_at(0)).now,
+        paper=paper,
+        dry_run=dry,
+        faults=faults,
+    )
 
 
 def command(token, signal, key=None, size="10"):
-    return OrderCommand(idempotency_key=key or f"open:{signal.id}", signal_id=signal.id,
-                        token_id=token.id, levels=LEVELS, size_units=D(size), token_mint=TOKEN_MINT)
+    return OrderCommand(
+        idempotency_key=key or f"open:{signal.id}",
+        signal_id=signal.id,
+        token_id=token.id,
+        levels=LEVELS,
+        size_units=D(size),
+        token_mint=TOKEN_MINT,
+    )
 
 
 class StateMachineTest(unittest.TestCase):
     def test_legal_transitions(self):
-        self.assertEqual(transition(OrderStatus.NEW, OrderStatus.FILLED), OrderStatus.FILLED)
-        self.assertEqual(transition(OrderStatus.FILLED, OrderStatus.CLOSED), OrderStatus.CLOSED)
+        self.assertEqual(
+            transition(OrderStatus.NEW, OrderStatus.FILLED), OrderStatus.FILLED
+        )
+        self.assertEqual(
+            transition(OrderStatus.FILLED, OrderStatus.CLOSED), OrderStatus.CLOSED
+        )
 
     def test_terminal_states_reject_any_transition(self):
         for terminal in (OrderStatus.REJECTED, OrderStatus.TIMEOUT, OrderStatus.CLOSED):
@@ -70,26 +102,36 @@ class SubmitTest(unittest.TestCase):
         self.assertEqual(order.status, OrderStatus.FILLED)
         self.assertEqual(order.fill_price, D("2") * D("1.005"))
         self.assertEqual(order.entry_fee, D("0.001") * D("2.01") * D("10"))
-        ledger = db.query_one("SELECT amount_quote FROM ledger_entries WHERE kind = 'ENTRY_FEE'")
+        ledger = db.query_one(
+            "SELECT amount_quote FROM ledger_entries WHERE kind = 'ENTRY_FEE'"
+        )
         self.assertEqual(D(ledger["amount_quote"]), -order.entry_fee)
 
     def test_reject_fault_has_no_fill_and_no_fee(self):
         db, token, signal = setup_db()
-        order = execution(db, faults=FaultPlan(reject=True)).submit(command(token, signal))
+        order = execution(db, faults=FaultPlan(reject=True)).submit(
+            command(token, signal)
+        )
         self.assertEqual(order.status, OrderStatus.REJECTED)
         self.assertIsNone(order.fill_price)
         self.assertEqual(order.filled_units, D(0))
-        self.assertEqual(db.query_one("SELECT COUNT(*) AS n FROM ledger_entries")["n"], 0)
+        self.assertEqual(
+            db.query_one("SELECT COUNT(*) AS n FROM ledger_entries")["n"], 0
+        )
 
     def test_timeout_fault_is_terminal_without_fill(self):
         db, token, signal = setup_db()
-        order = execution(db, faults=FaultPlan(timeout=True)).submit(command(token, signal))
+        order = execution(db, faults=FaultPlan(timeout=True)).submit(
+            command(token, signal)
+        )
         self.assertEqual(order.status, OrderStatus.TIMEOUT)
         self.assertEqual(execution(db).open_orders(), [])
 
     def test_partial_fill_fills_fraction_and_charges_fee_on_filled_part(self):
         db, token, signal = setup_db()
-        order = execution(db, faults=FaultPlan(partial_ratio=D("0.4"))).submit(command(token, signal))
+        order = execution(db, faults=FaultPlan(partial_ratio=D("0.4"))).submit(
+            command(token, signal)
+        )
         self.assertEqual(order.status, OrderStatus.PARTIALLY_FILLED)
         self.assertEqual(order.filled_units, D("4"))
         self.assertEqual(order.requested_units, D("10"))
@@ -168,7 +210,9 @@ class ClosureAndLedgerTest(unittest.TestCase):
         db, ex, order = self.open_order()
         ex.on_price(order.id, D("2.4"))
         with db.transaction() as conn:
-            conn.execute("UPDATE ledger_entries SET amount_quote = '999' WHERE kind = 'REALIZED_PNL'")
+            conn.execute(
+                "UPDATE ledger_entries SET amount_quote = '999' WHERE kind = 'REALIZED_PNL'"
+            )
         self.assertTrue(ex.reconcile())
 
     def test_fee_rate_zero_gives_pure_price_pnl(self):

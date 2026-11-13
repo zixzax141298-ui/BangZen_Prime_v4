@@ -51,8 +51,11 @@ class Supervisor:
                 continue
             if worker.places_orders and stop_now:
                 results[worker.name] = "SKIPPED_EMERGENCY_STOP"
-                self.metrics.inc("bangzen_worker_skipped_total", worker=worker.name,
-                                 reason="emergency_stop")
+                self.metrics.inc(
+                    "bangzen_worker_skipped_total",
+                    worker=worker.name,
+                    reason="emergency_stop",
+                )
                 continue
             try:
                 worker.run()
@@ -63,8 +66,12 @@ class Supervisor:
                 logger.error("worker %s failed: %s", worker.name, type(exc).__name__)
                 if worker.consecutive_failures >= self.max_consecutive_failures:
                     worker.disabled = True
-                    self.metrics.set_gauge("bangzen_worker_disabled", 1, worker=worker.name)
-                    logger.error("worker %s disabled after repeated failures", worker.name)
+                    self.metrics.set_gauge(
+                        "bangzen_worker_disabled", 1, worker=worker.name
+                    )
+                    logger.error(
+                        "worker %s disabled after repeated failures", worker.name
+                    )
             else:
                 worker.consecutive_failures = 0
                 results[worker.name] = "OK"
@@ -76,7 +83,9 @@ class Supervisor:
         self.metrics.set_gauge("bangzen_supervisor_cycles", self.cycles)
         return results
 
-    def run(self, *, interval_seconds: float = 5.0, max_cycles: int | None = None) -> int:
+    def run(
+        self, *, interval_seconds: float = 5.0, max_cycles: int | None = None
+    ) -> int:
         while not self._stop.is_set():
             self.run_cycle()
             if self._stop.is_set():

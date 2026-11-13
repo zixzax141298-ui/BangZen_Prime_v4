@@ -15,9 +15,9 @@ SELL_VELOCITY_MIN_COUNT = 15
 class PreDumpReport:
     is_dump_imminent: bool
     reason: str
-    drain_pct: Decimal = Decimal("0")
-    dev_sell_pct: Decimal = Decimal("0")
-    sell_ratio: Decimal = Decimal("0")
+    drain_pct: Decimal = Decimal(0)
+    dev_sell_pct: Decimal = Decimal(0)
+    sell_ratio: Decimal = Decimal(0)
 
 
 class PreDumpRadar:
@@ -37,10 +37,10 @@ class PreDumpRadar:
     def _safe_decimal(self, value: Any) -> Decimal:
         try:
             if value is None:
-                return Decimal("0")
+                return Decimal(0)
             return Decimal(str(value))
         except (InvalidOperation, ValueError):
-            return Decimal("0")
+            return Decimal(0)
 
     def analyze(
         self,
@@ -51,8 +51,8 @@ class PreDumpRadar:
         sells_m5: int,
     ) -> PreDumpReport:
         # 1. Deteksi LP Drain
-        if initial_liq > Decimal("0") and current_liq > Decimal("0"):
-            drain_pct = ((initial_liq - current_liq) / initial_liq) * Decimal("100")
+        if initial_liq > Decimal(0) and current_liq > Decimal(0):
+            drain_pct = ((initial_liq - current_liq) / initial_liq) * Decimal(100)
             if drain_pct >= LP_DRAIN_THRESHOLD_PCT:
                 return PreDumpReport(
                     is_dump_imminent=True,
@@ -81,7 +81,9 @@ class PreDumpRadar:
 
         return PreDumpReport(is_dump_imminent=False, reason="normal_flow")
 
-    def analyze_market_dict(self, market: dict[str, Any], audit: dict[str, Any]) -> PreDumpReport:
+    def analyze_market_dict(
+        self, market: dict[str, Any], audit: dict[str, Any]
+    ) -> PreDumpReport:
         """Helper untuk menganalisa langsung dari dict market/audit."""
         txns_m5 = market.get("txns_m5", {})
         buys, sells = 0, 0

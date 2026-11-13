@@ -83,7 +83,9 @@ class PriceLevels:
         stop = positive(self.stop_loss, "stop_loss")
         target = positive(self.take_profit, "take_profit")
         if not stop < entry < target:
-            raise DomainError("long levels must satisfy stop_loss < entry < take_profit")
+            raise DomainError(
+                "long levels must satisfy stop_loss < entry < take_profit"
+            )
         object.__setattr__(self, "entry", entry)
         object.__setattr__(self, "stop_loss", stop)
         object.__setattr__(self, "take_profit", target)
@@ -124,11 +126,15 @@ class Signal(AggregateRoot):
             raise DomainError("signal status is invalid")
         if status is SignalStatus.ACCEPTED:
             if not isinstance(levels, PriceLevels) or confidence is None or reasons:
-                raise DomainError("accepted signal needs levels and confidence and no reasons")
+                raise DomainError(
+                    "accepted signal needs levels and confidence and no reasons"
+                )
             unit_interval(confidence, "confidence")
         elif status in (SignalStatus.REJECTED, SignalStatus.WATCH):
             if not reasons or levels is not None or confidence is not None:
-                raise DomainError("rejected/watch signal needs reasons and no levels or confidence")
+                raise DomainError(
+                    "rejected/watch signal needs reasons and no levels or confidence"
+                )
         else:
             raise DomainError("unknown signal status")
         self.token_id = token_id
@@ -142,22 +148,46 @@ class Signal(AggregateRoot):
 
     @classmethod
     def accept(
-        cls, *, token_id: uuid.UUID, pair_id: uuid.UUID, score: Decimal,
-        confidence: Decimal, levels: PriceLevels, created_at: datetime,
-        chain: str | None = None, mint: str | None = None,
-        symbol: str | None = None, pair_address: str | None = None,
-        dex_id: str | None = None, market_source: str | None = None,
+        cls,
+        *,
+        token_id: uuid.UUID,
+        pair_id: uuid.UUID,
+        score: Decimal,
+        confidence: Decimal,
+        levels: PriceLevels,
+        created_at: datetime,
+        chain: str | None = None,
+        mint: str | None = None,
+        symbol: str | None = None,
+        pair_address: str | None = None,
+        dex_id: str | None = None,
+        market_source: str | None = None,
         market_observed_at: datetime | None = None,
     ) -> Signal:
         signal = cls(
-            token_id=token_id, pair_id=pair_id, status=SignalStatus.ACCEPTED,
-            score=score, reasons=(), created_at=created_at, levels=levels,
+            token_id=token_id,
+            pair_id=pair_id,
+            status=SignalStatus.ACCEPTED,
+            score=score,
+            reasons=(),
+            created_at=created_at,
+            levels=levels,
             confidence=confidence,
         )
-        metadata = (chain, mint, symbol, pair_address, dex_id, market_source, market_observed_at)
+        metadata = (
+            chain,
+            mint,
+            symbol,
+            pair_address,
+            dex_id,
+            market_source,
+            market_observed_at,
+        )
         if any(value is not None for value in metadata):
             if any(value is None for value in metadata):
-                raise DomainError("signal market identity and provenance must be supplied together")
+                raise DomainError(
+                    "signal market identity and provenance must be supplied together"
+                )
             if (
                 not isinstance(chain, str)
                 or not isinstance(mint, str)
@@ -167,18 +197,29 @@ class Signal(AggregateRoot):
                 or not isinstance(market_source, str)
                 or not isinstance(market_observed_at, datetime)
             ):
-                raise DomainError("signal market identity and provenance have invalid types")
+                raise DomainError(
+                    "signal market identity and provenance have invalid types"
+                )
             validate_chain(chain)
             validate_mint(mint)
             if token_identity(chain, mint) != token_id:
                 raise DomainError("signal mint does not match token identity")
             if pair_identity(chain, pair_address) != pair_id:
                 raise DomainError("signal pair address does not match pair identity")
-            if not isinstance(symbol, str) or not symbol or len(symbol) > 32 or not symbol.isprintable():
+            if (
+                not isinstance(symbol, str)
+                or not symbol
+                or len(symbol) > 32
+                or not symbol.isprintable()
+            ):
                 raise DomainError("signal symbol must be 1-32 printable characters")
             if not isinstance(dex_id, str) or not dex_id.strip() or len(dex_id) > 64:
                 raise DomainError("signal DEX id is invalid")
-            if not isinstance(market_source, str) or not market_source.strip() or len(market_source) > 64:
+            if (
+                not isinstance(market_source, str)
+                or not market_source.strip()
+                or len(market_source) > 64
+            ):
                 raise DomainError("signal market source is invalid")
             observed_at = ensure_utc(market_observed_at)
         else:
@@ -195,26 +236,37 @@ class Signal(AggregateRoot):
             "label": "SIGNAL_ONLY",
         }
         if observed_at is not None:
-            payload.update({
-                "chain": chain,
-                "mint": mint,
-                "symbol": symbol,
-                "pair_address": pair_address,
-                "dex_id": dex_id,
-                "market_source": market_source,
-                "market_observed_at": observed_at.isoformat(),
-            })
+            payload.update(
+                {
+                    "chain": chain,
+                    "mint": mint,
+                    "symbol": symbol,
+                    "pair_address": pair_address,
+                    "dex_id": dex_id,
+                    "market_source": market_source,
+                    "market_observed_at": observed_at.isoformat(),
+                }
+            )
         signal.record_event("SignalGenerated", payload, created_at)
         return signal
 
     @classmethod
     def reject(
-        cls, *, token_id: uuid.UUID, pair_id: uuid.UUID, score: Decimal,
-        reasons: tuple[RejectReason, ...], created_at: datetime,
+        cls,
+        *,
+        token_id: uuid.UUID,
+        pair_id: uuid.UUID,
+        score: Decimal,
+        reasons: tuple[RejectReason, ...],
+        created_at: datetime,
     ) -> Signal:
         return cls(
-            token_id=token_id, pair_id=pair_id, status=SignalStatus.REJECTED,
-            score=score, reasons=reasons, created_at=created_at,
+            token_id=token_id,
+            pair_id=pair_id,
+            status=SignalStatus.REJECTED,
+            score=score,
+            reasons=reasons,
+            created_at=created_at,
         )
 
 
@@ -230,10 +282,12 @@ class ResiliencePolicy:
             raise DomainError("failure_threshold must be a positive integer")
         if not isinstance(self.failure_threshold, int):
             raise DomainError("failure_threshold must be a positive integer")
-        if (isinstance(self.recovery_seconds, bool)
-                or not isinstance(self.recovery_seconds, (int, float))
-                or not math.isfinite(self.recovery_seconds)
-                or self.recovery_seconds <= 0):
+        if (
+            isinstance(self.recovery_seconds, bool)
+            or not isinstance(self.recovery_seconds, (int, float))
+            or not math.isfinite(self.recovery_seconds)
+            or self.recovery_seconds <= 0
+        ):
             raise DomainError("recovery_seconds must be a finite positive number")
 
 
@@ -246,8 +300,16 @@ class ResilienceConfig:
     ai_breaker: ResiliencePolicy
 
     def __post_init__(self) -> None:
-        if any(not isinstance(policy, ResiliencePolicy) for policy in (
-            self.market_breaker, self.safety_breaker, self.holder_breaker,
-            self.intel_breaker, self.ai_breaker,
-        )):
-            raise DomainError("all resilience policies must be validated ResiliencePolicy values")
+        if any(
+            not isinstance(policy, ResiliencePolicy)
+            for policy in (
+                self.market_breaker,
+                self.safety_breaker,
+                self.holder_breaker,
+                self.intel_breaker,
+                self.ai_breaker,
+            )
+        ):
+            raise DomainError(
+                "all resilience policies must be validated ResiliencePolicy values"
+            )

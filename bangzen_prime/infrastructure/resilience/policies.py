@@ -22,6 +22,7 @@ class Clock:
 
     def monotonic(self) -> float:
         import time
+
         return time.monotonic()
 
 
@@ -58,7 +59,9 @@ class RetryPolicy:
     def delay_for(self, attempt: int, retry_after: float | None) -> float:
         if retry_after is not None and retry_after >= 0:
             return min(retry_after, self.max_delay_seconds)
-        return min(self.base_delay_seconds * (2 ** (attempt - 1)), self.max_delay_seconds)
+        return min(
+            self.base_delay_seconds * (2 ** (attempt - 1)), self.max_delay_seconds
+        )
 
 
 class CircuitState(StrEnum):
@@ -68,8 +71,14 @@ class CircuitState(StrEnum):
 
 
 class CircuitBreaker:
-    def __init__(self, name: str, *, failure_threshold: int = 5,
-                 recovery_seconds: float = 30.0, clock: Clock | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        failure_threshold: int = 5,
+        recovery_seconds: float = 30.0,
+        clock: Clock | None = None,
+    ) -> None:
         self.name = name
         self._threshold = failure_threshold
         self._recovery = recovery_seconds
@@ -115,8 +124,13 @@ class CircuitBreaker:
 class TokenBucket:
     """Blocking-free limiter: `acquire` returns False when the bucket is empty."""
 
-    def __init__(self, *, rate_per_minute: float, capacity: float | None = None,
-                 clock: Clock | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        rate_per_minute: float,
+        capacity: float | None = None,
+        clock: Clock | None = None,
+    ) -> None:
         if rate_per_minute <= 0:
             raise ValueError("rate_per_minute must be positive")
         self._rate = rate_per_minute / 60.0
@@ -129,7 +143,9 @@ class TokenBucket:
     def acquire(self) -> bool:
         with self._lock:
             now = self._clock.monotonic()
-            self._tokens = min(self._capacity, self._tokens + (now - self._last) * self._rate)
+            self._tokens = min(
+                self._capacity, self._tokens + (now - self._last) * self._rate
+            )
             self._last = now
             if self._tokens >= 1.0:
                 self._tokens -= 1.0
@@ -153,16 +169,26 @@ class HealthMonitor:
     def snapshot(self) -> dict[str, dict[str, int]]:
         with self._lock:
             names = set(self.successes) | set(self.failures)
-            return {n: {"ok": self.successes.get(n, 0), "failed": self.failures.get(n, 0)}
-                    for n in sorted(names)}
+            return {
+                n: {"ok": self.successes.get(n, 0), "failed": self.failures.get(n, 0)}
+                for n in sorted(names)
+            }
 
 
 class ResilientCaller:
     """Wraps one outbound dependency with limiter, breaker, retries and health tracking."""
 
-    def __init__(self, name: str, *, retry: RetryPolicy, limiter: TokenBucket,
-                 breaker: CircuitBreaker, health: HealthMonitor,
-                 sleep: Callable[[float], None], clock: Clock | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        retry: RetryPolicy,
+        limiter: TokenBucket,
+        breaker: CircuitBreaker,
+        health: HealthMonitor,
+        sleep: Callable[[float], None],
+        clock: Clock | None = None,
+    ) -> None:
         self.name = name
         self._retry = retry
         self._limiter = limiter
@@ -178,8 +204,12 @@ class ResilientCaller:
             self._breaker.before_call()
             if not self._limiter.acquire():
                 self._health.record(self.name, ok=False)
-                raise ExternalServiceError(f"rate limit reached for {self.name}",
-                                           service=self.name, retryable=True, status=429)
+                raise ExternalServiceError(
+                    f"rate limit reached for {self.name}",
+                    service=self.name,
+                    retryable=True,
+                    status=429,
+                )
             try:
                 result = fn()
             except ExternalServiceError as exc:

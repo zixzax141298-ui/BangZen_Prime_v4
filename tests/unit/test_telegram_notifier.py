@@ -4,7 +4,9 @@ import json
 import unittest
 
 from bangzen_prime.errors import ExternalServiceError
-from bangzen_prime.infrastructure.adapters.notifications.telegram import TelegramNotifier
+from bangzen_prime.infrastructure.adapters.notifications.telegram import (
+    TelegramNotifier,
+)
 from bangzen_prime.infrastructure.http import HttpResponse
 
 
@@ -32,7 +34,9 @@ class TelegramNotifierTest(unittest.TestCase):
 
         self.assertEqual(len(transport.calls), 2)
         payloads = [json.loads(call.body.decode("utf-8")) for call in transport.calls]
-        self.assertEqual([payload["chat_id"] for payload in payloads], ["123", "-100456"])
+        self.assertEqual(
+            [payload["chat_id"] for payload in payloads], ["123", "-100456"]
+        )
         self.assertTrue(all(payload["text"] == "Signal TEST" for payload in payloads))
         self.assertTrue(all("parse_mode" not in payload for payload in payloads))
         self.assertTrue(all(call.method == "POST" for call in transport.calls))

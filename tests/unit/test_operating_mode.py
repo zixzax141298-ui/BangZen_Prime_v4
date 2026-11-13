@@ -9,7 +9,8 @@ from bangzen_prime.domain.operating_mode import OperatingMode, evaluate_mode
 class OperatingModePolicyTest(unittest.TestCase):
     def test_telegram_only_never_allows_execution_or_wallet_access(self):
         state = evaluate_mode(
-            OperatingMode.TELEGRAM_ONLY, kill_switch_engaged=False,
+            OperatingMode.TELEGRAM_ONLY,
+            kill_switch_engaged=False,
             live_execution_enabled=True,
         )
         self.assertTrue(state.telegram_enabled)
@@ -20,7 +21,8 @@ class OperatingModePolicyTest(unittest.TestCase):
 
     def test_execution_only_has_no_telegram_and_is_still_locked_by_default(self):
         state = evaluate_mode(
-            OperatingMode.EXECUTION_ONLY, kill_switch_engaged=True,
+            OperatingMode.EXECUTION_ONLY,
+            kill_switch_engaged=True,
             live_execution_enabled=False,
         )
         self.assertFalse(state.telegram_enabled)
@@ -32,7 +34,8 @@ class OperatingModePolicyTest(unittest.TestCase):
 
     def test_hybrid_enables_telegram_but_does_not_bypass_execution_lock(self):
         state = evaluate_mode(
-            OperatingMode.HYBRID, kill_switch_engaged=False,
+            OperatingMode.HYBRID,
+            kill_switch_engaged=False,
             live_execution_enabled=False,
         )
         self.assertTrue(state.telegram_enabled)

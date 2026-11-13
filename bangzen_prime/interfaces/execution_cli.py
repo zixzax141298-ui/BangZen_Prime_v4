@@ -4,6 +4,7 @@ The former implementation printed a simulated purchase using a hard-coded illust
 price and EV inputs. That output could be mistaken for an actual execution result.
 This replacement reports only the scanner's observed signal decision.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,21 +35,39 @@ def main(argv: list[str] | None = None) -> int:
     try:
         results = container.scan.execute("solana", [args.mint])
         if not results:
-            print(json.dumps({"status": "NO_RESULT", "mint": args.mint,
-                              "execution": "NOT_ATTEMPTED"}, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "status": "NO_RESULT",
+                        "mint": args.mint,
+                        "execution": "NOT_ATTEMPTED",
+                    },
+                    indent=2,
+                )
+            )
             return 1
         signal = results[0]
-        print(json.dumps({
-            "mint": args.mint,
-            "signal_status": signal.status,
-            "reasons": signal.reasons,
-            "execution": "NOT_ATTEMPTED",
-            "live_trading": False,
-        }, indent=2, default=str))
+        print(
+            json.dumps(
+                {
+                    "mint": args.mint,
+                    "signal_status": signal.status,
+                    "reasons": signal.reasons,
+                    "execution": "NOT_ATTEMPTED",
+                    "live_trading": False,
+                },
+                indent=2,
+                default=str,
+            )
+        )
         return 0 if signal.status == "ACCEPTED" else 1
     except BangzenError as exc:
-        print(json.dumps({"status": "ERROR", "reason": str(exc),
-                          "execution": "NOT_ATTEMPTED"}), file=sys.stderr)
+        print(
+            json.dumps(
+                {"status": "ERROR", "reason": str(exc), "execution": "NOT_ATTEMPTED"}
+            ),
+            file=sys.stderr,
+        )
         return 1
     finally:
         container.db.close()

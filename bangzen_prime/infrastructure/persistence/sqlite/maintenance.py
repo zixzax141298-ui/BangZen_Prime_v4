@@ -11,8 +11,19 @@ from bangzen_prime.errors import PersistenceError
 from bangzen_prime.infrastructure.persistence.sqlite.database import Database, utc_iso
 from bangzen_prime.infrastructure.persistence.sqlite.outbox import AuditLog
 
-REQUIRED_TABLES = frozenset({"tokens", "pairs", "signals", "outbox", "audit_log", "orders",
-                             "ledger_entries", "chain_attempts", "schema_migrations"})
+REQUIRED_TABLES = frozenset(
+    {
+        "tokens",
+        "pairs",
+        "signals",
+        "outbox",
+        "audit_log",
+        "orders",
+        "ledger_entries",
+        "chain_attempts",
+        "schema_migrations",
+    }
+)
 
 
 def backup(db: Database, dest_path: str) -> None:
@@ -44,7 +55,12 @@ def verify_database_file(path: str) -> None:
         conn = _open_readonly(path)
         try:
             integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
-            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            tables = {
+                r[0]
+                for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
             if integrity != "ok":
                 raise PersistenceError("backup failed integrity check")
             missing = REQUIRED_TABLES - tables
@@ -76,8 +92,10 @@ def prune(db: Database, *, now: datetime, retain: timedelta) -> dict[str, int]:
     """
     cutoff = utc_iso(now - retain)
     with db.transaction() as conn:
-        sent = conn.execute("DELETE FROM outbox WHERE status = 'SENT' AND sent_at < ?",
-                            (cutoff,)).rowcount
-        processed = conn.execute("DELETE FROM processed_events WHERE processed_at < ?",
-                                 (cutoff,)).rowcount
+        sent = conn.execute(
+            "DELETE FROM outbox WHERE status = 'SENT' AND sent_at < ?", (cutoff,)
+        ).rowcount
+        processed = conn.execute(
+            "DELETE FROM processed_events WHERE processed_at < ?", (cutoff,)
+        ).rowcount
     return {"outbox_sent_deleted": sent, "processed_events_deleted": processed}

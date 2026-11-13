@@ -3,13 +3,15 @@
 Infrastructure adapters retain their own retry/limiting primitives. This module
 keeps the application dependency direction clean and provides async call semantics.
 """
+
 from __future__ import annotations
 
 import inspect
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from bangzen_prime.errors import CircuitOpenError
 

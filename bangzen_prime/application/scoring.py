@@ -21,11 +21,13 @@ EARLY_PHASE_WEIGHTS = {
     "safety": Decimal("0.35"),
     "momentum": Decimal("0.20"),
 }
-LIQUIDITY_FULL_SCORE_USD = Decimal("100000")
-VOLUME_FULL_SCORE_USD = Decimal("500000")
-RSI_CENTER = Decimal("55")
+LIQUIDITY_FULL_SCORE_USD = Decimal(100000)
+VOLUME_FULL_SCORE_USD = Decimal(500000)
+RSI_CENTER = Decimal(55)
 _EARLY_PHASES = frozenset({"UNKNOWN", "LAUNCH", "EARLY"})
-_VALID_PHASES = frozenset({"UNKNOWN", "LAUNCH", "EARLY", "GROWTH", "MATURE", "CEX_LISTED"})
+_VALID_PHASES = frozenset(
+    {"UNKNOWN", "LAUNCH", "EARLY", "GROWTH", "MATURE", "CEX_LISTED"}
+)
 
 
 def _clip(value: Decimal) -> Decimal:
@@ -47,8 +49,12 @@ class ScoreBreakdown:
 
 
 def score_token(
-    *, liquidity_usd: Decimal, volume_24h_usd: Decimal, risk_score: Decimal,
-    rsi_value: Decimal, phase: str = "MATURE",
+    *,
+    liquidity_usd: Decimal,
+    volume_24h_usd: Decimal,
+    risk_score: Decimal,
+    rsi_value: Decimal,
+    phase: str = "MATURE",
 ) -> ScoreBreakdown:
     if phase not in _VALID_PHASES:
         raise ValueError("unsupported token lifecycle phase")

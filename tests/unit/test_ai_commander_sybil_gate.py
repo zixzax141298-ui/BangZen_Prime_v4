@@ -55,12 +55,14 @@ def make_commander(sybil):
 class AICommanderSybilGateTests(unittest.TestCase):
     def setUp(self):
         self.context = object()
-        self.holders = [{"address": "wallet-a"}, {"address": "wallet-b"}, {"address": "wallet-c"}]
+        self.holders = [
+            {"address": "wallet-a"},
+            {"address": "wallet-b"},
+            {"address": "wallet-c"},
+        ]
 
     def test_missing_holder_evidence_blocks_before_provider_or_ai(self):
-        sybil = FakeSybil(
-            report=SimpleNamespace(available=True, is_bundled=False)
-        )
+        sybil = FakeSybil(report=SimpleNamespace(available=True, is_bundled=False))
         commander, brain = make_commander(sybil)
 
         result = asyncio.run(commander.execute("mint-address", self.context, {}, {}))
@@ -71,9 +73,7 @@ class AICommanderSybilGateTests(unittest.TestCase):
         self.assertEqual(brain.calls, 0)
 
     def test_unavailable_sybil_evidence_blocks_ai(self):
-        sybil = FakeSybil(
-            report=SimpleNamespace(available=False, is_bundled=None)
-        )
+        sybil = FakeSybil(report=SimpleNamespace(available=False, is_bundled=None))
         commander, brain = make_commander(sybil)
 
         result = asyncio.run(
@@ -87,9 +87,7 @@ class AICommanderSybilGateTests(unittest.TestCase):
         self.assertEqual(brain.calls, 0)
 
     def test_confirmed_shared_funder_cluster_blocks_ai(self):
-        sybil = FakeSybil(
-            report=SimpleNamespace(available=True, is_bundled=True)
-        )
+        sybil = FakeSybil(report=SimpleNamespace(available=True, is_bundled=True))
         commander, brain = make_commander(sybil)
 
         result = asyncio.run(
@@ -117,9 +115,7 @@ class AICommanderSybilGateTests(unittest.TestCase):
         self.assertEqual(brain.calls, 0)
 
     def test_only_explicit_clear_sybil_result_allows_honeypot_and_ai(self):
-        sybil = FakeSybil(
-            report=SimpleNamespace(available=True, is_bundled=False)
-        )
+        sybil = FakeSybil(report=SimpleNamespace(available=True, is_bundled=False))
         commander, brain = make_commander(sybil)
 
         result = asyncio.run(

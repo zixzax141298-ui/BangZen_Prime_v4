@@ -16,7 +16,9 @@ PAIR_ADDRESS = "HxFLKUAmAMLz1jtT3hbvCMELwH5H9tpM2QugP8sKyfhc"
 START = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 
 
-def json_response(payload: object, status: int = 200, headers: dict | None = None) -> HttpResponse:
+def json_response(
+    payload: object, status: int = 200, headers: dict | None = None
+) -> HttpResponse:
     return HttpResponse(status, json.dumps(payload).encode("utf-8"), headers or {})
 
 
@@ -53,9 +55,17 @@ class RecordingNotifier:
         self.sent.append(text)
 
 
-def pair_payload(*, price: str = "0.00100", liquidity: float = 200000.0,
-                 volume: float = 300000.0, chain: str = "solana", mint: str = TOKEN_MINT,
-                 pair_address: str = PAIR_ADDRESS, symbol: str = "TEST", created_ms: int | None = None) -> dict:
+def pair_payload(
+    *,
+    price: str = "0.00100",
+    liquidity: float = 200000.0,
+    volume: float = 300000.0,
+    chain: str = "solana",
+    mint: str = TOKEN_MINT,
+    pair_address: str = PAIR_ADDRESS,
+    symbol: str = "TEST",
+    created_ms: int | None = None,
+) -> dict:
     extra = {} if created_ms is None else {"pairCreatedAt": created_ms}
     return {
         **extra,
@@ -70,8 +80,9 @@ def pair_payload(*, price: str = "0.00100", liquidity: float = 200000.0,
     }
 
 
-def safety_payload(*, score: float = 10.0, rugged: bool | None = None,
-                   risks: list | None = None) -> dict:
+def safety_payload(
+    *, score: float = 10.0, rugged: bool | None = None, risks: list | None = None
+) -> dict:
     payload: dict = {"score_normalised": score, "risks": risks or []}
     if rugged is not None:
         payload["rugged"] = rugged

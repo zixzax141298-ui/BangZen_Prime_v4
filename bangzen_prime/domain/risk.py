@@ -14,14 +14,15 @@ from bangzen_prime.errors import DomainError
 
 @dataclass(frozen=True)
 class SizingResult:
-    size_units: Decimal          # base token units
-    risk_amount_quote: Decimal   # size * abs(entry - stop_loss), excludes fees
+    size_units: Decimal  # base token units
+    risk_amount_quote: Decimal  # size * abs(entry - stop_loss), excludes fees
     estimated_fees_quote: Decimal
-    exposure_quote: Decimal      # size * entry (notional)
+    exposure_quote: Decimal  # size * entry (notional)
 
 
-def size_position(*, equity_quote: object, risk_pct: object, levels: PriceLevels,
-                  fee_rate: Decimal) -> SizingResult:
+def size_position(
+    *, equity_quote: object, risk_pct: object, levels: PriceLevels, fee_rate: Decimal
+) -> SizingResult:
     """Size so that (risk + round-trip fees) equals the per-trade risk budget."""
     equity = positive(equity_quote, "equity_quote")
     risk = percent(risk_pct, "risk_pct", allow_zero=False)
@@ -60,15 +61,26 @@ class PortfolioSnapshot:
     last_loss_at: datetime | None = None
 
     @classmethod
-    def create(cls, *, equity_quote: object, peak_equity_quote: object,
-               open_positions: tuple[OpenPosition, ...], as_of: datetime,
-               last_loss_at: datetime | None = None) -> PortfolioSnapshot:
+    def create(
+        cls,
+        *,
+        equity_quote: object,
+        peak_equity_quote: object,
+        open_positions: tuple[OpenPosition, ...],
+        as_of: datetime,
+        last_loss_at: datetime | None = None,
+    ) -> PortfolioSnapshot:
         equity = non_negative(equity_quote, "equity_quote")
         peak = positive(peak_equity_quote, "peak_equity_quote")
         if peak < equity:
             raise DomainError("peak equity cannot be below current equity")
-        return cls(equity, peak, tuple(open_positions), ensure_utc(as_of),
-                   ensure_utc(last_loss_at) if last_loss_at else None)
+        return cls(
+            equity,
+            peak,
+            tuple(open_positions),
+            ensure_utc(as_of),
+            ensure_utc(last_loss_at) if last_loss_at else None,
+        )
 
     @property
     def open_count(self) -> int:
@@ -80,4 +92,8 @@ class PortfolioSnapshot:
 
     @property
     def drawdown_pct(self) -> Decimal:
-        return (self.peak_equity_quote - self.equity_quote) / self.peak_equity_quote * Decimal(100)
+        return (
+            (self.peak_equity_quote - self.equity_quote)
+            / self.peak_equity_quote
+            * Decimal(100)
+        )

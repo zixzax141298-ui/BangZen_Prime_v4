@@ -10,7 +10,6 @@ from bangzen_prime.application.wallet_access import (
 )
 from bangzen_prime.domain.operating_mode import OperatingMode
 
-
 PUBLIC_ADDRESS = "So11111111111111111111111111111111111111112"
 
 

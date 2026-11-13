@@ -6,10 +6,18 @@ from typing import Any
 
 from bangzen_prime.application.ai_brain import AIBrain, TradeContext
 from bangzen_prime.application.smart_money_engine import SmartMoneyEngine
-from bangzen_prime.infrastructure.adapters.market_data.cross_chain_radar_adapter import CrossChainRadarAdapter
-from bangzen_prime.infrastructure.adapters.market_data.lp_sniper_adapter import LPSniperAdapter
-from bangzen_prime.infrastructure.adapters.market_data.news_adapter import NewsScraperAdapter
-from bangzen_prime.infrastructure.adapters.onchain.honeypot_adapter import HoneypotAdapter
+from bangzen_prime.infrastructure.adapters.market_data.cross_chain_radar_adapter import (
+    CrossChainRadarAdapter,
+)
+from bangzen_prime.infrastructure.adapters.market_data.lp_sniper_adapter import (
+    LPSniperAdapter,
+)
+from bangzen_prime.infrastructure.adapters.market_data.news_adapter import (
+    NewsScraperAdapter,
+)
+from bangzen_prime.infrastructure.adapters.onchain.honeypot_adapter import (
+    HoneypotAdapter,
+)
 from bangzen_prime.infrastructure.adapters.onchain.sybil_adapter import SybilAdapter
 
 logger = logging.getLogger(__name__)
@@ -53,7 +61,9 @@ class AICommander:
             )
             return []
         if not isinstance(tools, list):
-            logger.warning("[AICommander] AI tool config has invalid shape: %s", path.name)
+            logger.warning(
+                "[AICommander] AI tool config has invalid shape: %s", path.name
+            )
             return []
         return tools
 
@@ -96,9 +106,7 @@ class AICommander:
 
         # Gate 2: Sybil evidence must be present and explicitly clear.
         top_holders = (
-            audit_data.get("top_holders")
-            if isinstance(audit_data, dict)
-            else None
+            audit_data.get("top_holders") if isinstance(audit_data, dict) else None
         )
         if not isinstance(top_holders, list) or not top_holders:
             logger.warning(
@@ -157,7 +165,7 @@ class AICommander:
 
         return AIDecision(
             decision="SKIP",
-            confidence=Decimal("0"),
+            confidence=Decimal(0),
             reason=reason,
             source="commander_prefilter",
         )

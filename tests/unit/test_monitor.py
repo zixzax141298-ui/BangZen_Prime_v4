@@ -51,8 +51,12 @@ class FakeWorker:
 
 
 def monitor_with(scan, clock, per_minute=2, mints=MINTS):
-    return Monitor(scan=scan, worker=FakeWorker(),
-                   budget=default_budget_registry(clock, scans_per_minute=per_minute), watchlist=mints)
+    return Monitor(
+        scan=scan,
+        worker=FakeWorker(),
+        budget=default_budget_registry(clock, scans_per_minute=per_minute),
+        watchlist=mints,
+    )
 
 
 class BudgetInMonitorTests(unittest.TestCase):
@@ -85,20 +89,29 @@ class BudgetInMonitorTests(unittest.TestCase):
 class PhaseTransitionTests(unittest.TestCase):
     def test_phase_change_between_cycles_is_recorded_once(self):
         clock = Clock()
-        scan = FakeScan({MINTS[0]: ["LAUNCH", "EARLY", "EARLY", "GROWTH"]}, status="REJECTED")
+        scan = FakeScan(
+            {MINTS[0]: ["LAUNCH", "EARLY", "EARLY", "GROWTH"]}, status="REJECTED"
+        )
         m = monitor_with(scan, clock, per_minute=10, mints=(MINTS[0],))
         seen = []
         for _ in range(4):
             seen.extend(m.run_cycle().transitions)
             clock.t += 1
-        self.assertEqual([(t.old, t.new) for t in seen], [("LAUNCH", "EARLY"), ("EARLY", "GROWTH")])
+        self.assertEqual(
+            [(t.old, t.new) for t in seen], [("LAUNCH", "EARLY"), ("EARLY", "GROWTH")]
+        )
 
     def test_outbox_is_drained_every_cycle(self):
         clock = Clock()
         worker = FakeWorker()
-        m = Monitor(scan=FakeScan({}), worker=worker,
-                    budget=default_budget_registry(clock, scans_per_minute=10), watchlist=MINTS[:1])
-        m.run_cycle(); m.run_cycle()
+        m = Monitor(
+            scan=FakeScan({}),
+            worker=worker,
+            budget=default_budget_registry(clock, scans_per_minute=10),
+            watchlist=MINTS[:1],
+        )
+        m.run_cycle()
+        m.run_cycle()
         self.assertEqual(worker.runs, 2)
 
     def test_run_respects_cycle_count_and_sleeps_between_cycles_only(self):
@@ -130,9 +143,14 @@ class WatchlistTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             load_watchlist(self._file("# nothing\n"))
         import itertools
+
         alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-        combos = (MINTS[0][:-2] + a + b for a, b in itertools.product(alphabet, repeat=2))
-        big = "\n".join(itertools.islice(combos, MAX_WATCHLIST + 1))  # 201 distinct, valid-length mints
+        combos = (
+            MINTS[0][:-2] + a + b for a, b in itertools.product(alphabet, repeat=2)
+        )
+        big = "\n".join(
+            itertools.islice(combos, MAX_WATCHLIST + 1)
+        )  # 201 distinct, valid-length mints
         with self.assertRaises(ConfigurationError):
             load_watchlist(self._file(big))
 

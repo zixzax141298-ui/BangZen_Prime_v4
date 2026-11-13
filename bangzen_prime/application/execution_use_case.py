@@ -21,7 +21,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Protocol
@@ -124,21 +124,17 @@ class JupiterOrderPort(Protocol):
         """Return an object with request_id and transaction_b64."""
         ...
 
-    async def execute(
-        self, *, signed_transaction_b64: str, request_id: str
-    ) -> Any:
+    async def execute(self, *, signed_transaction_b64: str, request_id: str) -> Any:
         """Optional Jupiter /execute path; not required if Helius.send is used."""
         ...
 
 
 class WalletSignerPort(Protocol):
-    def sign_transaction(self, serialized_tx_base64: str) -> str:
-        ...
+    def sign_transaction(self, serialized_tx_base64: str) -> str: ...
 
 
 class HeliusExecutionPort(Protocol):
-    async def simulate(self, signed_transaction_b64: str) -> SimulationResult:
-        ...
+    async def simulate(self, signed_transaction_b64: str) -> SimulationResult: ...
 
     async def send(self, signed_transaction_b64: str) -> str:
         """Return transaction signature / hash."""
@@ -146,8 +142,7 @@ class HeliusExecutionPort(Protocol):
 
 
 class NotifierPort(Protocol):
-    async def send(self, text: str) -> None:
-        ...
+    async def send(self, text: str) -> None: ...
 
 
 class PaperFillPort(Protocol):
@@ -196,7 +191,7 @@ class ExecutionUseCase:
         self._paper_fill = paper_fill
         self._market_price_lookup = market_price_lookup
         self._fee_rate = fee_rate
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
         self._network_retry = network_retry or RetryPolicy(
             max_attempts=3, base_delay_seconds=0.5, max_delay_seconds=8.0
         )
@@ -214,9 +209,7 @@ class ExecutionUseCase:
         order_id = plan.client_order_id or str(uuid.uuid4())
 
         if self._policy.emergency_stop:
-            return self._reject(
-                mode, order_id, ExecutionPath.NONE, ("EMERGENCY_STOP",)
-            )
+            return self._reject(mode, order_id, ExecutionPath.NONE, ("EMERGENCY_STOP",))
 
         # --- TELEGRAM_ONLY: notify, never execute ---
         if mode is OperatingMode.TELEGRAM_ONLY:
@@ -274,7 +267,7 @@ class ExecutionUseCase:
         order_id: str,
         now: datetime,
     ) -> TradeResult:
-        price = Decimal("1")
+        price = Decimal(1)
         if self._market_price_lookup is not None:
             try:
                 price = await self._market_price_lookup(plan.output_mint)
@@ -364,7 +357,10 @@ class ExecutionUseCase:
         except Exception as exc:  # noqa: BLE001
             logger.warning("sign failed: %s", type(exc).__name__)
             return self._reject(
-                mode, order_id, ExecutionPath.LIVE, ("SIGNING_FAILED", type(exc).__name__)
+                mode,
+                order_id,
+                ExecutionPath.LIVE,
+                ("SIGNING_FAILED", type(exc).__name__),
             )
         if not isinstance(signed_b64, str) or not signed_b64.strip():
             return self._reject(
@@ -390,7 +386,9 @@ class ExecutionUseCase:
                 mode=mode,
             )
         if not isinstance(sim, SimulationResult) or not sim.ok:
-            code = sim.error_code if isinstance(sim, SimulationResult) else "SIM_INVALID"
+            code = (
+                sim.error_code if isinstance(sim, SimulationResult) else "SIM_INVALID"
+            )
             return TradeResult(
                 status=TradeStatus.ABORTED,
                 path=ExecutionPath.LIVE,

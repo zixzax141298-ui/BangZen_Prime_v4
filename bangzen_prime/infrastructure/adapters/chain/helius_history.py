@@ -14,7 +14,11 @@ from datetime import datetime
 from typing import Any
 
 from bangzen_prime.errors import DomainError, ExternalServiceError
-from bangzen_prime.infrastructure.http import HttpRequest, RequestTransport, request_json
+from bangzen_prime.infrastructure.http import (
+    HttpRequest,
+    RequestTransport,
+    request_json,
+)
 from bangzen_prime.infrastructure.resilience.policies import ResilientCaller
 
 SERVICE = "helius"
@@ -25,8 +29,11 @@ _MAX_PAGE_SIZE = 1000
 
 class HeliusHistoryMalformed(ExternalServiceError):
     def __init__(self, detail: str) -> None:
-        super().__init__(f"helius historical response malformed: {detail}",
-                         service=SERVICE, retryable=False)
+        super().__init__(
+            f"helius historical response malformed: {detail}",
+            service=SERVICE,
+            retryable=False,
+        )
 
 
 @dataclass(frozen=True)
@@ -105,7 +112,9 @@ class HeliusHistoryReader:
             self._timeout,
         )
         payload = self._caller.call(
-            lambda: request_json(service=SERVICE, request=request, transport=self._transport)
+            lambda: request_json(
+                service=SERVICE, request=request, transport=self._transport
+            )
         )
         if not isinstance(payload, dict) or payload.get("jsonrpc") != "2.0":
             raise HeliusHistoryMalformed("expected JSON-RPC 2.0 object")
@@ -128,7 +137,9 @@ class HeliusHistoryReader:
             if digit < 0:
                 raise ValueError("invalid base58")
             number = number * 58 + digit
-        decoded = number.to_bytes((number.bit_length() + 7) // 8, "big") if number else b""
+        decoded = (
+            number.to_bytes((number.bit_length() + 7) // 8, "big") if number else b""
+        )
         leading_zeroes = len(value) - len(value.lstrip("1"))
         return (b"\x00" * leading_zeroes) + decoded
 
@@ -207,11 +218,15 @@ class HeliusHistoryReader:
                 raise HeliusHistoryMalformed("signature page is not newest-first")
             previous_slot = slot
             if block_time is not None and (
-                isinstance(block_time, bool) or not isinstance(block_time, int) or block_time < 0
+                isinstance(block_time, bool)
+                or not isinstance(block_time, int)
+                or block_time < 0
             ):
                 raise HeliusHistoryMalformed("invalid blockTime")
             if confirmation is not None and confirmation not in {
-                "processed", "confirmed", "finalized"
+                "processed",
+                "confirmed",
+                "finalized",
             }:
                 raise HeliusHistoryMalformed("invalid confirmationStatus")
             if memo is not None and not isinstance(memo, str):
@@ -268,7 +283,9 @@ class HeliusHistoryReader:
         if isinstance(slot, bool) or not isinstance(slot, int) or slot < 0:
             raise HeliusHistoryMalformed("transaction slot missing or invalid")
         if block_time is not None and (
-            isinstance(block_time, bool) or not isinstance(block_time, int) or block_time < 0
+            isinstance(block_time, bool)
+            or not isinstance(block_time, int)
+            or block_time < 0
         ):
             raise HeliusHistoryMalformed("transaction blockTime invalid")
         meta = result.get("meta")
@@ -290,7 +307,11 @@ class HeliusHistoryReader:
         keys = message.get("accountKeys")
         pre = meta.get("preBalances")
         post = meta.get("postBalances")
-        if not isinstance(keys, list) or not isinstance(pre, list) or not isinstance(post, list):
+        if (
+            not isinstance(keys, list)
+            or not isinstance(pre, list)
+            or not isinstance(post, list)
+        ):
             raise HeliusHistoryMalformed("transaction account/balance arrays missing")
         if len(keys) != len(pre) or len(keys) != len(post):
             raise HeliusHistoryMalformed("account and balance array lengths disagree")
@@ -301,11 +322,15 @@ class HeliusHistoryReader:
             try:
                 self._validate_address(address)
             except DomainError:
-                raise HeliusHistoryMalformed("invalid transaction account key") from None
+                raise HeliusHistoryMalformed(
+                    "invalid transaction account key"
+                ) from None
             account_keys.append(address)
         for balances in (pre, post):
-            if any(isinstance(value, bool) or not isinstance(value, int) or value < 0
-                   for value in balances):
+            if any(
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+                for value in balances
+            ):
                 raise HeliusHistoryMalformed("invalid lamport balance")
         return HistoricalTransaction(
             signature=signature,

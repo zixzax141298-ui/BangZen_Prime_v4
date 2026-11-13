@@ -3,10 +3,17 @@ import unittest
 from datetime import timedelta
 from decimal import Decimal
 
-from bangzen_prime.infrastructure.adapters.market_data.lunarcrush import LunarCrushSentimentAdapter
+from bangzen_prime.infrastructure.adapters.market_data.lunarcrush import (
+    LunarCrushSentimentAdapter,
+)
 from bangzen_prime.infrastructure.http import HttpResponse, TransportTimeout
 from bangzen_prime.infrastructure.resilience.policies import (
-    CircuitBreaker, FakeClock, HealthMonitor, ResilientCaller, RetryPolicy, TokenBucket,
+    CircuitBreaker,
+    FakeClock,
+    HealthMonitor,
+    ResilientCaller,
+    RetryPolicy,
+    TokenBucket,
 )
 from tests.support import START
 
@@ -102,7 +109,9 @@ class LunarCrushSentimentTests(unittest.TestCase):
         adapter, _, _ = self.make_adapter(
             lambda request: HttpResponse(
                 200,
-                json.dumps(payload(int((START - timedelta(minutes=20)).timestamp()))).encode(),
+                json.dumps(
+                    payload(int((START - timedelta(minutes=20)).timestamp()))
+                ).encode(),
                 {},
             )
         )
@@ -113,7 +122,9 @@ class LunarCrushSentimentTests(unittest.TestCase):
         adapter, _, _ = self.make_adapter(
             lambda request: HttpResponse(
                 200,
-                json.dumps(payload(int(START.timestamp()), types_interactions={})).encode(),
+                json.dumps(
+                    payload(int(START.timestamp()), types_interactions={})
+                ).encode(),
                 {},
             )
         )

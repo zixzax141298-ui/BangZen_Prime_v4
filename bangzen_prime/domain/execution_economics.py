@@ -4,6 +4,7 @@ All monetary inputs MUST be normalized into the same quote currency and scale.
 Expected exit value is gross, before the explicit costs below. No provider I/O,
 token-decimal conversion, sizing, policy selection, signing, or execution occurs here.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,7 +13,7 @@ from decimal import Decimal
 from bangzen_prime.domain.values import non_negative, positive
 from bangzen_prime.errors import DomainError
 
-ZERO = Decimal("0")
+ZERO = Decimal(0)
 
 
 @dataclass(frozen=True)

@@ -59,9 +59,7 @@ class Token2022ConfigurationDecoderTests(unittest.TestCase):
         self.assertIn("NON_TRANSFERABLE", parsed.risk_flags)
 
     def test_decodes_metadata_pointer_authority_and_target(self):
-        parsed = decode_token_2022_extension_configurations(
-            _tlv(18, _key(7) + _key(8))
-        )
+        parsed = decode_token_2022_extension_configurations(_tlv(18, _key(7) + _key(8)))
         self.assertEqual(parsed.configurations[0].authorities[0][1], _base58(_key(7)))
         self.assertEqual(parsed.configurations[0].authorities[1][1], _base58(_key(8)))
 
@@ -73,18 +71,14 @@ class Token2022ConfigurationDecoderTests(unittest.TestCase):
         )
 
     def test_decodes_transfer_hook_authority_and_program(self):
-        parsed = decode_token_2022_extension_configurations(
-            _tlv(14, _key(3) + _key(4))
-        )
+        parsed = decode_token_2022_extension_configurations(_tlv(14, _key(3) + _key(4)))
         config = parsed.configurations[0]
         self.assertEqual(config.authorities[0][1], _base58(_key(3)))
         self.assertEqual(config.authorities[1][1], _base58(_key(4)))
         self.assertIn("TRANSFER_HOOK_PROGRAM_CONFIGURED", config.risk_flags)
 
     def test_decodes_pausable_state(self):
-        parsed = decode_token_2022_extension_configurations(
-            _tlv(26, _key(5) + b"\x01")
-        )
+        parsed = decode_token_2022_extension_configurations(_tlv(26, _key(5) + b"\x01"))
         config = parsed.configurations[0]
         self.assertEqual(dict(config.parameters)["paused"], True)
         self.assertIn("TOKEN_TRANSFERS_PAUSED", config.risk_flags)
@@ -116,7 +110,9 @@ class Token2022ConfigurationDecoderTests(unittest.TestCase):
         self.assertEqual(dict(parsed.configurations[0].parameters)["multiplier"], 1.5)
         invalid = bytes(32) + struct.pack("<dqd", float("nan"), 1000, 2.0)
         self.assertEqual(
-            decode_token_2022_extension_configurations(_tlv(25, invalid)).validation_status,
+            decode_token_2022_extension_configurations(
+                _tlv(25, invalid)
+            ).validation_status,
             REJECTED,
         )
 
@@ -134,24 +130,26 @@ class Token2022ConfigurationDecoderTests(unittest.TestCase):
 
     def test_rejects_bad_lengths_and_fee_rates(self):
         self.assertEqual(
-            decode_token_2022_extension_configurations(_tlv(14, bytes(63))).validation_status,
+            decode_token_2022_extension_configurations(
+                _tlv(14, bytes(63))
+            ).validation_status,
             REJECTED,
         )
         value = (
-            bytes(64)
-            + bytes(8)
-            + bytes(16)
-            + (10001).to_bytes(2, "little")
-            + bytes(18)
+            bytes(64) + bytes(8) + bytes(16) + (10001).to_bytes(2, "little") + bytes(18)
         )
         self.assertEqual(
-            decode_token_2022_extension_configurations(_tlv(1, value)).validation_status,
+            decode_token_2022_extension_configurations(
+                _tlv(1, value)
+            ).validation_status,
             REJECTED,
         )
 
     def test_rejects_invalid_default_state_and_pausable_flag(self):
         self.assertEqual(
-            decode_token_2022_extension_configurations(_tlv(6, b"\x03")).validation_status,
+            decode_token_2022_extension_configurations(
+                _tlv(6, b"\x03")
+            ).validation_status,
             REJECTED,
         )
         self.assertEqual(
@@ -169,7 +167,9 @@ class Token2022ConfigurationDecoderTests(unittest.TestCase):
             REJECTED,
         )
         self.assertEqual(
-            decode_token_2022_extension_configurations(_tlv(15, b"\x01")).validation_status,
+            decode_token_2022_extension_configurations(
+                _tlv(15, b"\x01")
+            ).validation_status,
             REJECTED,
         )
 

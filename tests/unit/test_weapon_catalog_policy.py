@@ -11,7 +11,12 @@ class PolicyConfigTests(unittest.TestCase):
         data = json.loads(CATALOG.read_text(encoding="utf-8"))
         assert data["declared_count"] == 29
         assert len(data["weapons"]) == 29
-        assert data["category_counts"] == {"MARKET_READING": 8, "RISK_MANAGEMENT": 10, "EXECUTION": 6, "CORE_STRATEGY": 5}
+        assert data["category_counts"] == {
+            "MARKET_READING": 8,
+            "RISK_MANAGEMENT": 10,
+            "EXECUTION": 6,
+            "CORE_STRATEGY": 5,
+        }
         assert len({item["id"] for item in data["weapons"]}) == 29
 
     def test_ai_manager_never_receives_execution_or_core_strategy_authority(self):

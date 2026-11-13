@@ -38,11 +38,23 @@ class JupiterSwapV2Tests(unittest.TestCase):
 
     def test_order_returns_validated_unsigned_transaction(self):
         tx = base64.b64encode(b"unsigned-solana-tx").decode()
-        recorder = RequestRecorder([response({
-            "transaction": tx, "requestId": "req-123", "inputMint": SOL_MINT,
-            "outputMint": TOKEN_MINT, "inAmount": "1000", "outAmount": "25000",
-            "router": "metis", "transactionVersion": 0, "lastValidBlockHeight": 12345,
-        })])
+        recorder = RequestRecorder(
+            [
+                response(
+                    {
+                        "transaction": tx,
+                        "requestId": "req-123",
+                        "inputMint": SOL_MINT,
+                        "outputMint": TOKEN_MINT,
+                        "inAmount": "1000",
+                        "outAmount": "25000",
+                        "router": "metis",
+                        "transactionVersion": 0,
+                        "lastValidBlockHeight": 12345,
+                    }
+                )
+            ]
+        )
         order = self.adapter(recorder).order(
             input_mint=SOL_MINT, output_mint=TOKEN_MINT, amount=1000, taker=SOL_MINT
         )
@@ -54,11 +66,22 @@ class JupiterSwapV2Tests(unittest.TestCase):
 
     def test_order_rejects_mint_mismatch(self):
         tx = base64.b64encode(b"tx").decode()
-        recorder = RequestRecorder([response({
-            "transaction": tx, "requestId": "req", "inputMint": TOKEN_MINT,
-            "outputMint": TOKEN_MINT, "inAmount": "1000", "outAmount": "2",
-            "router": "metis", "transactionVersion": 0,
-        })])
+        recorder = RequestRecorder(
+            [
+                response(
+                    {
+                        "transaction": tx,
+                        "requestId": "req",
+                        "inputMint": TOKEN_MINT,
+                        "outputMint": TOKEN_MINT,
+                        "inAmount": "1000",
+                        "outAmount": "2",
+                        "router": "metis",
+                        "transactionVersion": 0,
+                    }
+                )
+            ]
+        )
         with self.assertRaises(ExternalServiceError):
             self.adapter(recorder).order(
                 input_mint=SOL_MINT, output_mint=TOKEN_MINT, amount=1000, taker=SOL_MINT
@@ -66,10 +89,19 @@ class JupiterSwapV2Tests(unittest.TestCase):
 
     def test_execute_posts_signed_transaction_once_and_parses_result(self):
         signed = base64.b64encode(b"signed-solana-tx").decode()
-        recorder = RequestRecorder([response({
-            "status": "Success", "signature": "sig-123", "code": 0,
-            "totalInputAmount": "1000", "totalOutputAmount": "24000",
-        })])
+        recorder = RequestRecorder(
+            [
+                response(
+                    {
+                        "status": "Success",
+                        "signature": "sig-123",
+                        "code": 0,
+                        "totalInputAmount": "1000",
+                        "totalOutputAmount": "24000",
+                    }
+                )
+            ]
+        )
         result = self.adapter(recorder).execute(
             signed_transaction_b64=signed, request_id="req-123"
         )
@@ -91,10 +123,18 @@ class JupiterSwapV2Tests(unittest.TestCase):
 
     def test_execute_rejects_incomplete_success_response(self):
         signed = base64.b64encode(b"signed-solana-tx").decode()
-        recorder = RequestRecorder([response({
-            "status": "Success", "code": 0, "totalInputAmount": "1",
-            "totalOutputAmount": "2",
-        })])
+        recorder = RequestRecorder(
+            [
+                response(
+                    {
+                        "status": "Success",
+                        "code": 0,
+                        "totalInputAmount": "1",
+                        "totalOutputAmount": "2",
+                    }
+                )
+            ]
+        )
         with self.assertRaises(ExternalServiceError):
             self.adapter(recorder).execute(
                 signed_transaction_b64=signed, request_id="req"

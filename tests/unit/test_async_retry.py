@@ -55,7 +55,9 @@ class AsyncRetryTests(unittest.IsolatedAsyncioTestCase):
 
         result = await async_retry(
             op,
-            policy=RetryPolicy(max_attempts=3, base_delay_seconds=0.5, max_delay_seconds=8),
+            policy=RetryPolicy(
+                max_attempts=3, base_delay_seconds=0.5, max_delay_seconds=8
+            ),
             sleep=sleep,
             operation_name="test",
         )
@@ -68,7 +70,9 @@ class AsyncRetryTests(unittest.IsolatedAsyncioTestCase):
 
         async def op():
             calls["n"] += 1
-            raise ExternalServiceError("nope", service="rpc", retryable=False, status=400)
+            raise ExternalServiceError(
+                "nope", service="rpc", retryable=False, status=400
+            )
 
         with self.assertRaises(ExternalServiceError):
             await async_retry(
@@ -83,7 +87,9 @@ class AsyncRetryTests(unittest.IsolatedAsyncioTestCase):
 
         async def op():
             calls["n"] += 1
-            raise ExternalServiceError("down", service="rpc", retryable=True, status=503)
+            raise ExternalServiceError(
+                "down", service="rpc", retryable=True, status=503
+            )
 
         with self.assertRaises(ExternalServiceError):
             await async_retry(
@@ -104,7 +110,9 @@ class AsyncRetryTests(unittest.IsolatedAsyncioTestCase):
         async def sleep(d: float) -> None:
             sleeps.append(d)
             # stop after first sleep by switching — use max_attempts=2
-            raise ExternalServiceError("rate", service="rpc", retryable=True, status=429)
+            raise ExternalServiceError(
+                "rate", service="rpc", retryable=True, status=429
+            )
 
         # simpler: one failure then success with retry_after on first
         state = {"n": 0}
@@ -124,7 +132,9 @@ class AsyncRetryTests(unittest.IsolatedAsyncioTestCase):
 
         result = await async_retry(
             op2,
-            policy=RetryPolicy(max_attempts=3, base_delay_seconds=0.5, max_delay_seconds=8),
+            policy=RetryPolicy(
+                max_attempts=3, base_delay_seconds=0.5, max_delay_seconds=8
+            ),
             sleep=sleep2,
         )
         self.assertEqual(result, "done")

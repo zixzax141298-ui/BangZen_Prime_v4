@@ -70,7 +70,7 @@ def mean_abs_change(values: Sequence[Decimal], period: int) -> Decimal:
     if period < 1:
         raise DomainError("period must be >= 1")
     _require(values, period + 1, "mean_abs_change")
-    window = values[-(period + 1):]
+    window = values[-(period + 1) :]
     diffs = [abs(window[i] - window[i - 1]) for i in range(1, len(window))]
     return sum(diffs, ZERO) / Decimal(period)
 

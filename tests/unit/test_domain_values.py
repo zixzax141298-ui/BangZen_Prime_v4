@@ -25,13 +25,13 @@ class ValueParsingTest(unittest.TestCase):
                 positive(raw, "price")
 
     def test_non_negative_accepts_zero(self):
-        self.assertEqual(non_negative("0", "liq"), Decimal("0"))
+        self.assertEqual(non_negative("0", "liq"), Decimal(0))
         with self.assertRaises(DomainError):
             non_negative("-1", "liq")
 
     def test_percent_boundaries(self):
-        self.assertEqual(percent("0", "p"), Decimal("0"))
-        self.assertEqual(percent("100", "p"), Decimal("100"))
+        self.assertEqual(percent("0", "p"), Decimal(0))
+        self.assertEqual(percent("100", "p"), Decimal(100))
         for raw in ("-0.01", "100.01"):
             with self.subTest(raw=raw), self.assertRaises(DomainError):
                 percent(raw, "p")
@@ -41,7 +41,7 @@ class ValueParsingTest(unittest.TestCase):
             percent("0", "risk", allow_zero=False)
 
     def test_unit_interval_boundaries(self):
-        self.assertEqual(unit_interval("1", "c"), Decimal("1"))
+        self.assertEqual(unit_interval("1", "c"), Decimal(1))
         with self.assertRaises(DomainError):
             unit_interval("1.0001", "c")
 

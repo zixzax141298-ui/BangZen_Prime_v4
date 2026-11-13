@@ -34,12 +34,25 @@ def notifier(responses, *, clock=None, cooldown=60.0, sleeps=None):
         return item
 
     transport = RecordingTransport(handler)
-    caller = ResilientCaller("telegram", retry=RetryPolicy(max_attempts=3, base_delay_seconds=0),
-                             limiter=TokenBucket(rate_per_minute=6000, clock=clock),
-                             breaker=CircuitBreaker("telegram", clock=clock), health=HealthMonitor(),
-                             sleep=sleeps.append, clock=clock)
-    n = TelegramNotifier(token=TOKEN, chat_id=CHAT, allowed_chat_ids=(CHAT,), transport=transport,
-                         caller=caller, timeout=5, clock=clock.monotonic, cooldown_seconds=cooldown)
+    caller = ResilientCaller(
+        "telegram",
+        retry=RetryPolicy(max_attempts=3, base_delay_seconds=0),
+        limiter=TokenBucket(rate_per_minute=6000, clock=clock),
+        breaker=CircuitBreaker("telegram", clock=clock),
+        health=HealthMonitor(),
+        sleep=sleeps.append,
+        clock=clock,
+    )
+    n = TelegramNotifier(
+        token=TOKEN,
+        chat_id=CHAT,
+        allowed_chat_ids=(CHAT,),
+        transport=transport,
+        caller=caller,
+        timeout=5,
+        clock=clock.monotonic,
+        cooldown_seconds=cooldown,
+    )
     return n, transport, sleeps, clock
 
 
@@ -73,7 +86,9 @@ class TelegramTest(unittest.TestCase):
 
     def test_429_honours_retry_after_then_succeeds(self):
         body = json.dumps({"ok": False, "parameters": {"retry_after": 4}}).encode()
-        n, transport, sleeps, _ = notifier([HttpResponse(429, body, {}), HttpResponse(200, b"{}", {})])
+        n, transport, sleeps, _ = notifier(
+            [HttpResponse(429, body, {}), HttpResponse(200, b"{}", {})]
+        )
         n.send("hi")
         self.assertEqual(len(transport.calls), 2)
         self.assertEqual(sleeps, [4.0])
@@ -115,15 +130,27 @@ class TelegramTest(unittest.TestCase):
 
     def test_unauthorised_chat_rejected_at_construction(self):
         with self.assertRaises(ConfigurationError):
-            TelegramNotifier(token=TOKEN, chat_id="99", allowed_chat_ids=("42",),
-                             transport=lambda u, t: None, caller=None, timeout=1,
-                             clock=lambda: 0.0)
+            TelegramNotifier(
+                token=TOKEN,
+                chat_id="99",
+                allowed_chat_ids=("42",),
+                transport=lambda u, t: None,
+                caller=None,
+                timeout=1,
+                clock=lambda: 0.0,
+            )
 
     def test_missing_token_rejected(self):
         with self.assertRaises(ConfigurationError):
-            TelegramNotifier(token="", chat_id="42", allowed_chat_ids=("42",),
-                             transport=lambda u, t: None, caller=None, timeout=1,
-                             clock=lambda: 0.0)
+            TelegramNotifier(
+                token="",
+                chat_id="42",
+                allowed_chat_ids=("42",),
+                transport=lambda u, t: None,
+                caller=None,
+                timeout=1,
+                clock=lambda: 0.0,
+            )
 
     def test_token_hidden_from_repr(self):
         n, _, _, _ = notifier([])
@@ -132,20 +159,42 @@ class TelegramTest(unittest.TestCase):
 
 class CommandTest(unittest.TestCase):
     def test_status_reply_for_allowed_chat(self):
-        out = handle_command(chat_id="42", command="/status now", allowed_chat_ids=("42",),
-                             status_text=lambda: "live=false paper=true")
+        out = handle_command(
+            chat_id="42",
+            command="/status now",
+            allowed_chat_ids=("42",),
+            status_text=lambda: "live=false paper=true",
+        )
         self.assertIn("live=false", out)
         self.assertIn(LABEL, out)
 
     def test_unauthorised_chat_gets_no_reply(self):
-        self.assertIsNone(handle_command(chat_id="7", command="/status", allowed_chat_ids=("42",),
-                                         status_text=lambda: "secret"))
+        self.assertIsNone(
+            handle_command(
+                chat_id="7",
+                command="/status",
+                allowed_chat_ids=("42",),
+                status_text=lambda: "secret",
+            )
+        )
 
     def test_unknown_command_ignored(self):
-        self.assertIsNone(handle_command(chat_id="42", command="/buy", allowed_chat_ids=("42",),
-                                         status_text=lambda: "x"))
-        self.assertIsNone(handle_command(chat_id="42", command="   ", allowed_chat_ids=("42",),
-                                         status_text=lambda: "x"))
+        self.assertIsNone(
+            handle_command(
+                chat_id="42",
+                command="/buy",
+                allowed_chat_ids=("42",),
+                status_text=lambda: "x",
+            )
+        )
+        self.assertIsNone(
+            handle_command(
+                chat_id="42",
+                command="   ",
+                allowed_chat_ids=("42",),
+                status_text=lambda: "x",
+            )
+        )
 
 
 if __name__ == "__main__":

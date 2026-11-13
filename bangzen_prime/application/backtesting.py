@@ -7,16 +7,16 @@ candidate candle closes; execution therefore starts at the next candle's open.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Sequence
 
 from bangzen_prime.errors import DomainError
 
-ZERO = Decimal("0")
-ONE = Decimal("1")
-HUNDRED = Decimal("100")
+ZERO = Decimal(0)
+ONE = Decimal(1)
+HUNDRED = Decimal(100)
 
 
 def _finite(value: Decimal, name: str) -> Decimal:
@@ -92,8 +92,8 @@ class TradeCandidate:
 
 @dataclass(frozen=True)
 class BacktestConfig:
-    initial_equity: Decimal = Decimal("1000")
-    position_notional: Decimal = Decimal("100")
+    initial_equity: Decimal = Decimal(1000)
+    position_notional: Decimal = Decimal(100)
     fee_rate_per_side: Decimal = Decimal("0.001")
     slippage_rate_per_side: Decimal = Decimal("0.002")
     max_holding_candles: int = 60

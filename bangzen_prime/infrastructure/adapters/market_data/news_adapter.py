@@ -1,15 +1,20 @@
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable
+
 import httpx
 from defusedxml import ElementTree as ET
 
 logger = logging.getLogger(__name__)
 
 TARGET_KEYWORDS = ("Elon", "Trump", "AI", "BlackRock", "SEC")
-RSS_FEEDS = ("https://www.coindesk.com/arc/outboundfeeds/rss/", "https://cointelegraph.com/rss")
+RSS_FEEDS = (
+    "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "https://cointelegraph.com/rss",
+)
+
 
 @dataclass(frozen=True)
 class NewsReport:
@@ -18,8 +23,14 @@ class NewsReport:
     is_cached: bool
     reason: str = ""
 
+
 class NewsScraperAdapter:
-    def __init__(self, transport: httpx.AsyncClient, clock: Callable[[], datetime], cache_ttl_sec: int = 300):
+    def __init__(
+        self,
+        transport: httpx.AsyncClient,
+        clock: Callable[[], datetime],
+        cache_ttl_sec: int = 300,
+    ):
         self.transport = transport
         self.clock = clock
         self.cache_ttl_sec = cache_ttl_sec
@@ -29,7 +40,14 @@ class NewsScraperAdapter:
         found = set()
         try:
             root = ET.fromstring(content.strip())
-            corpus = " ".join([item.text for item in root.iter() if item.tag.lower().endswith(("title", "description", "summary")) and item.text])
+            corpus = " ".join(
+                [
+                    item.text
+                    for item in root.iter()
+                    if item.tag.lower().endswith(("title", "description", "summary"))
+                    and item.text
+                ]
+            )
             for kw in TARGET_KEYWORDS:
                 if re.search(r"\b" + re.escape(kw) + r"\b", corpus, re.IGNORECASE):
                     found.add(kw)
@@ -39,8 +57,17 @@ class NewsScraperAdapter:
 
     async def fetch_active_keywords(self, force: bool = False) -> NewsReport:
         now_ts = self.clock().timestamp()
-        if not force and self._cache["result"] and (now_ts - self._cache["ts"] < self.cache_ttl_sec):
-            return NewsReport(self._cache["result"].active_keywords, self._cache["result"].fetched_at, True, "cache_hit")
+        if (
+            not force
+            and self._cache["result"]
+            and (now_ts - self._cache["ts"] < self.cache_ttl_sec)
+        ):
+            return NewsReport(
+                self._cache["result"].active_keywords,
+                self._cache["result"].fetched_at,
+                True,
+                "cache_hit",
+            )
 
         active = set()
         for url in RSS_FEEDS:
