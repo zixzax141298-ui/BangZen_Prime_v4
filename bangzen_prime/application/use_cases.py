@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 from bangzen_prime.application.ai_brain import AIBrain, TradeContext
 from bangzen_prime.application.indicators import mean_abs_change, rsi
@@ -203,8 +204,14 @@ class AuditTokenUseCase:
         return assessment
 
 
-# Stable import path: from bangzen_prime.application.use_cases import ScanMarketUseCase
-from bangzen_prime.application.scan_market import ScanMarketUseCase  # noqa: E402
+def __getattr__(name: str) -> Any:
+    """Lazy export of ScanMarketUseCase to avoid circular imports with scan_market."""
+    if name == "ScanMarketUseCase":
+        from bangzen_prime.application.scan_market import ScanMarketUseCase as _SMC
+
+        return _SMC
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "ScanResult",
