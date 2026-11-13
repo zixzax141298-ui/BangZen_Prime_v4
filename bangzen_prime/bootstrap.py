@@ -66,7 +66,7 @@ from bangzen_prime.infrastructure.adapters.market_data.news_adapter import NewsS
 from bangzen_prime.infrastructure.adapters.market_data.cross_chain_radar_adapter import CrossChainRadarAdapter
 
 from bangzen_prime.infrastructure.adapters.execution.wallet_signer import WalletSigner
-from bangzen_prime.infrastructure.adapters.chain.jupiter_v2 import JupiterQuoteAdapter as JupiterV2Adapter
+from bangzen_prime.infrastructure.adapters.chain.jupiter_v2 import JupiterSwapV2Adapter as JupiterV2Adapter
 
 
 @dataclass
@@ -398,7 +398,6 @@ def build_container(
                 transport=intel_transport,
                 caller=caller("jupiter_v2", 600),
                 timeout=settings.http_timeout_seconds,
-                clock=clock.now,
             )
             exec_policy = ExecutionPolicy(
                 paper_trading=settings.paper_trading,
