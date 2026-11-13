@@ -57,7 +57,10 @@ from bangzen_prime.infrastructure.adapters.market_data.lp_sniper_adapter import 
 from bangzen_prime.infrastructure.adapters.market_data.news_adapter import NewsScraperAdapter
 from bangzen_prime.infrastructure.adapters.market_data.cross_chain_radar_adapter import CrossChainRadarAdapter
 
-
+# IMPORTS UNTUK EKSEKUSI (LIVE TRADING)
+from bangzen_prime.application.execution_use_case import ExecutionUseCase, ExecutionPolicy
+from bangzen_prime.infrastructure.adapters.execution.wallet_signer import WalletSigner
+from bangzen_prime.infrastructure.adapters.chain.jupiter_v2 import JupiterQuoteAdapter as JupiterV2Adapter
 
 
 @dataclass
@@ -107,7 +110,7 @@ class Container:
     lifecycle_store: LifecycleStore
     discovery: ContinuousDiscoveryUseCase
     token_program_evidence: TokenProgramEvidenceUseCase
-    live_executor: object | None = None
+    live_executor: ExecutionUseCase | None = None # <--- DIUBAH TIPE DATANYA
 
 
 def build_intel_stack(settings: Settings, *, transport, clock: Clock | None = None, sleep: Callable[[float], None] = time.sleep) -> IntelStack:
@@ -289,7 +292,48 @@ def build_container(settings: Settings, *, transport: Transport | None = None, c
             smart_money=smart_money,
         )
 
+    # ============================================================
+    # RAKITAN EKSEKUSI (LIVE TRADING)
+    # ============================================================
     live_executor = None
+    if settings.live_trading and settings.burner_private_key:
+        try:
+            # 1. Siapkan Signer (Wallet)
+            signer = WalletSigner(private_key_b58=settings.burner_private_key)
+            
+            # 2. Siapkan Jupiter V2 (untuk Swap)
+            # Menggunakan intel_transport karena Jupiter V2 membutuhkan RequestTransport
+            jupiter_v2 = JupiterV2Adapter(
+                api_key=settings.jupiter_api_key or "",
+                transport=intel_transport,
+                caller=caller("jupiter_v2", 600),
+                timeout=settings.http_timeout_seconds,
+                clock=clock.now,
+            )
+            
+            # 3. Siapkan Policy
+            exec_policy = ExecutionPolicy(
+                paper_trading=settings.paper_trading,
+                dry_run=settings.dry_run,
+                live_enabled=settings.live_trading,
+                emergency_stop=settings.emergency_stop,
+            )
+            
+            # 4. Rakit ExecutionUseCase
+            # Catatan: Pastikan Anda memiliki file execution_use_case.py
+            # yang menerima parameter ini. Jika belum, kita akan buat nanti.
+            live_executor = ExecutionUseCase(
+                mode_controller=mode_controller,
+                policy=exec_policy,
+                signer=signer,
+                jupiter=jupiter_v2,
+                helius=intel.helius,
+                notifier=sink, # Mengirim notifikasi jika mode HYBRID
+            )
+            logging.getLogger(__name__).info("[BOOTSTRAP] Live Executor berhasil diinisialisasi (Mode: %s)", settings.operating_mode)
+        except Exception as e:
+            logging.getLogger(__name__).error("[BOOTSTRAP] Gagal menginisialisasi Live Executor: %s", e)
+            live_executor = None
 
     return Container(
         settings=settings, mode_controller=mode_controller,
@@ -300,5 +344,5 @@ def build_container(settings: Settings, *, transport: Transport | None = None, c
         ai_commander=ai_commander,
         lifecycle_store=lifecycle_store, discovery=discovery,
         token_program_evidence=token_program_evidence,
-        live_executor=live_executor
+        live_executor=live_executor # <--- SEKARANG BERISI OBJEK, BUKAN NONE
     )
