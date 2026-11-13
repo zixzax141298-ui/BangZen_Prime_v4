@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from decimal import Decimal  # <--- PENTING: IMPORT DECIMAL
 
 from bangzen_prime.application.discovery import ContinuousDiscoveryUseCase
 from bangzen_prime.application.event_bus import EventBus
@@ -35,6 +36,7 @@ from bangzen_prime.infrastructure.persistence.sqlite.repositories import UnitOfW
 from bangzen_prime.infrastructure.resilience.policies import CircuitBreaker, Clock, HealthMonitor, ResilientCaller, RetryPolicy, TokenBucket
 from bangzen_prime.application.phase_policy import DEFAULT_POLICY, load_policy
 from bangzen_prime.settings import Settings
+from bangzen_prime.domain.signals import Signal, SignalStatus
 
 # ============================================================
 # IMPORTS 28 SENJATA (v3)
@@ -110,7 +112,7 @@ class Container:
     lifecycle_store: LifecycleStore
     discovery: ContinuousDiscoveryUseCase
     token_program_evidence: TokenProgramEvidenceUseCase
-    live_executor: ExecutionUseCase | None = None # <--- DIUBAH TIPE DATANYA
+    live_executor: ExecutionUseCase | None = None
 
 
 def build_intel_stack(settings: Settings, *, transport, clock: Clock | None = None, sleep: Callable[[float], None] = time.sleep) -> IntelStack:
@@ -193,6 +195,7 @@ def build_container(settings: Settings, *, transport: Transport | None = None, c
         mode_controller=mode_controller,
         emergency_stop=settings.emergency_stop,
     )
+    
     if notifier is not None:
         sink = ModeGatedNotifier(notifier, mode_controller)
     elif settings.telegram_bot_token and settings.telegram_allowed_chat_ids:
@@ -205,6 +208,7 @@ def build_container(settings: Settings, *, transport: Transport | None = None, c
         sink = ModeGatedNotifier(telegram, mode_controller)
     else:
         sink = LogNotifier(logging.getLogger("bangzen_prime.signals"))
+        
     bus.subscribe(SIGNAL_EVENT, SUBSCRIBER_NAME, make_notification_handler(sink))
     worker = OutboxWorker(db=db, bus=bus, clock=clock.now, base_backoff=timedelta(seconds=5))
 
@@ -253,7 +257,6 @@ def build_container(settings: Settings, *, transport: Transport | None = None, c
     second_life = SecondLifeStrategy()
     smart_money = SmartMoneyEngine()
     blacklist = AutoBlacklistManager()
-
     autopsy = AutopsyEngine(db_connection=db._conn)
 
     dev_predictor = DevPredictorAdapter(transport=transport, helius_api_key=settings.helius_api_key or "")
@@ -293,16 +296,12 @@ def build_container(settings: Settings, *, transport: Transport | None = None, c
         )
 
     # ============================================================
-    # RAKITAN EKSEKUSI (LIVE TRADING)
+    # RAKITAN EKSEKUSI (LIVE TRADING) & SUBSCRIBER
     # ============================================================
     live_executor = None
     if settings.live_trading and settings.burner_private_key:
         try:
-            # 1. Siapkan Signer (Wallet)
             signer = WalletSigner(private_key_b58=settings.burner_private_key)
-            
-            # 2. Siapkan Jupiter V2 (untuk Swap)
-            # Menggunakan intel_transport karena Jupiter V2 membutuhkan RequestTransport
             jupiter_v2 = JupiterV2Adapter(
                 api_key=settings.jupiter_api_key or "",
                 transport=intel_transport,
@@ -310,27 +309,45 @@ def build_container(settings: Settings, *, transport: Transport | None = None, c
                 timeout=settings.http_timeout_seconds,
                 clock=clock.now,
             )
-            
-            # 3. Siapkan Policy
             exec_policy = ExecutionPolicy(
                 paper_trading=settings.paper_trading,
                 dry_run=settings.dry_run,
                 live_enabled=settings.live_trading,
                 emergency_stop=settings.emergency_stop,
             )
-            
-            # 4. Rakit ExecutionUseCase
-            # Catatan: Pastikan Anda memiliki file execution_use_case.py
-            # yang menerima parameter ini. Jika belum, kita akan buat nanti.
             live_executor = ExecutionUseCase(
                 mode_controller=mode_controller,
                 policy=exec_policy,
                 signer=signer,
                 jupiter=jupiter_v2,
                 helius=intel.helius,
-                notifier=sink, # Mengirim notifikasi jika mode HYBRID
+                notifier=sink, 
             )
-            logging.getLogger(__name__).info("[BOOTSTRAP] Live Executor berhasil diinisialisasi (Mode: %s)", settings.operating_mode)
+            
+            # FUNGSI HANDLER UNTUK MENANGKAP SINYAL DARI EVENT BUS DAN MENGEKSEKUSI
+            def make_execution_handler(executor: ExecutionUseCase):
+                async def handler(event_name: str, payload: dict):
+                    # Cek apakah payload memiliki status ACCEPTED
+                    if payload.get("status") == SignalStatus.ACCEPTED.value:
+                        # Rekonstruksi objek Signal dari payload event
+                        signal = Signal(
+                            token_id=payload["token_id"],
+                            pair_id=payload["pair_id"],
+                            status=SignalStatus.ACCEPTED,
+                            score=Decimal(str(payload["score"])),
+                            reasons=(),
+                            confidence=Decimal("1.0"),
+                            levels=None, 
+                            created_at=clock.now(),
+                            id=payload.get("signal_id", "")
+                        )
+                        await executor.execute(signal)
+                return handler
+
+            # Daftarkan Subscriber Eksekusi ke EventBus
+            bus.subscribe(SIGNAL_EVENT, "execution_subscriber", make_execution_handler(live_executor))
+            logging.getLogger(__name__).info("[BOOTSTRAP] Live Executor & Subscriber berhasil diinisialisasi (Mode: %s)", settings.operating_mode)
+            
         except Exception as e:
             logging.getLogger(__name__).error("[BOOTSTRAP] Gagal menginisialisasi Live Executor: %s", e)
             live_executor = None
@@ -344,5 +361,5 @@ def build_container(settings: Settings, *, transport: Transport | None = None, c
         ai_commander=ai_commander,
         lifecycle_store=lifecycle_store, discovery=discovery,
         token_program_evidence=token_program_evidence,
-        live_executor=live_executor # <--- SEKARANG BERISI OBJEK, BUKAN NONE
+        live_executor=live_executor
     )
