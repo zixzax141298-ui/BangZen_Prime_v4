@@ -70,11 +70,6 @@ def _parse_int(key: str, raw: str, *, lo: int, hi: int) -> int:
 
 
 def parse_env_file(path: str) -> dict[str, str]:
-    """Read KEY=VALUE lines from a dotenv file. Only BANGZEN_* keys are returned.
-
-    Stdlib only, so it works in a bare Termux install. Missing file means no overrides.
-    Values are passed through from_env, which applies the same validation as real env vars.
-    """
     if not os.path.isfile(path):
         return {}
     values: dict[str, str] = {}
@@ -97,10 +92,6 @@ def parse_env_file(path: str) -> dict[str, str]:
 
 
 def load_settings_env(dotenv_path: str = ".env") -> dict[str, str]:
-    """Process environment, with BANGZEN_* values from the dotenv file filling any gaps.
-
-    Real environment variables always win over the file.
-    """
     merged = dict(os.environ)
     for key, value in parse_env_file(dotenv_path).items():
         merged.setdefault(key, value)
@@ -133,7 +124,7 @@ class Settings:
     telegram_allowed_chat_ids: tuple[str, ...] = ()
     operating_mode: OperatingMode = OperatingMode.TELEGRAM_ONLY
     wallet_public_address: str | None = field(default=None, repr=False)
-    burner_private_key: str | None = field(default=None, repr=False)  # <--- DITAMBAHKAN
+    burner_private_key: str | None = field(default=None, repr=False) # <--- DITAMBAHKAN
     broadcast_enabled: bool = False
     helius_api_key: str | None = field(default=None, repr=False)
     birdeye_api_key: str | None = field(default=None, repr=False)
@@ -165,8 +156,6 @@ class Settings:
             except DomainError:
                 raise ConfigurationError("BANGZEN_WALLET_PUBLIC_ADDRESS must be a valid Solana public address") from None
         
-        # Live execution block is kept for now to satisfy existing tests.
-        # We will remove this in the next step when enabling 3 modes.
         if self.mode != "paper":
             raise ConfigurationError("BANGZEN_MODE must be 'paper'; live execution is not implemented")
         if self.ai_provider not in AI_PROVIDERS:
@@ -301,7 +290,7 @@ class Settings:
             if (v := value(key)) is not None:
                 kwargs[attr] = v.strip()
 
-        if (v := value("BURNER_PRIVATE_KEY")) is not None:  # <--- DITAMBAHKAN
+        if (v := value("BURNER_PRIVATE_KEY")) is not None: # <--- DITAMBAHKAN
             kwargs["burner_private_key"] = v.strip()
 
         if (v := value("AI_ENABLED")) is not None:
