@@ -201,3 +201,17 @@ class AuditTokenUseCase:
         if assessment.chain != chain or assessment.mint != mint:
             raise DomainError("safety assessment identity does not match request")
         return assessment
+
+
+# Stable import path: from bangzen_prime.application.use_cases import ScanMarketUseCase
+from bangzen_prime.application.scan_market import ScanMarketUseCase  # noqa: E402
+
+__all__ = [
+    "ScanResult",
+    "SignalPolicy",
+    "RiskGovernor",
+    "select_best_pair",
+    "build_signal",
+    "AuditTokenUseCase",
+    "ScanMarketUseCase",
+]
