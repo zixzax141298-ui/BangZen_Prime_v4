@@ -28,7 +28,9 @@ fn bundle_within_limits(num_txs: u64, tip_lamports: u64, cap_lamports: u64) -> b
 /// Escapes the three characters Telegram HTML requires. Matches html.escape(quote=False).
 #[pyfunction]
 fn html_escape(text: &str) -> String {
-    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 #[pymodule]

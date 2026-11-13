@@ -104,7 +104,7 @@ def python_checks() -> list[Check]:
                 ),
                 Check(
                     "Pip-Audit",
-                    ("pip-audit", "--strict"),
+                    ("pip-audit", "--strict", "--skip-editable"),
                     executable="pip-audit",
                 ),
             ]
