@@ -50,7 +50,8 @@ jobs:
       - name: Install project and validation tools
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install -e ".[dev,security]"
+          # PERBAIKAN: Tanda '-e' dihapus agar pip-audit tidak error
+          python -m pip install ".[dev,security]"
 
       - name: Install cargo-audit
         if: hashFiles('native/rust/Cargo.toml') != ''
