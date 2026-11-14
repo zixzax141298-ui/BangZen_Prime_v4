@@ -20,3 +20,4 @@ native/rust/target/
 *.db*
 *.egg-info/
 .env
+build/
