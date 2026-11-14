@@ -1,4 +1,3 @@
-
 """Portable, fail-closed validation gate for BANGZEN PRIME."""
 
 from __future__ import annotations
