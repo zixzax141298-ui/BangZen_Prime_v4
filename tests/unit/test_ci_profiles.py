@@ -40,11 +40,30 @@ class TestProfileResolution(unittest.TestCase):
 
 class TestProfileChecks(unittest.TestCase):
     def test_termux_contains_only_portable_checks(self):
-        names = [check.name for check in build_checks("termux")]
+        checks = build_checks("termux")
+
+        applicable = [
+            check.name
+            for check in checks
+            if "termux" in check.profiles
+        ]
+
         self.assertEqual(
-            names,
+            applicable,
             ["Compile", "Canonical unittest suite"],
         )
+
+        self.assertIn(
+            "Black",
+            [check.name for check in checks],
+        )
+
+        black_check = next(
+            check for check in checks
+            if check.name == "Black"
+        )
+
+        self.assertNotIn("termux", black_check.profiles)
 
     def test_full_profile_contains_python_security_checks(self):
         names = {check.name for check in build_checks("github")}
@@ -74,7 +93,9 @@ class TestProfileChecks(unittest.TestCase):
         fake_manifest.is_file.return_value = True
         with patch("tools.ci.RUST_MANIFEST", fake_manifest):
             names = {check.name for check in build_checks("vps")}
-        self.assertTrue({"Cargo fmt", "Cargo test", "Cargo Audit"}.issubset(names))
+        self.assertTrue(
+            {"Cargo fmt", "Cargo test", "Cargo Audit"}.issubset(names)
+        )
 
 
 if __name__ == "__main__":

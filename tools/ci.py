@@ -320,9 +320,17 @@ def evaluate_gate(
     records: list[dict[str, Any]],
 ) -> tuple[str, str, bool]:
     """Fail closed when any applicable required check does not pass."""
+    paired = list(zip(checks, records, strict=True))
+    for check, record in paired:
+        if record.get("name") != check.name:
+            raise ValueError(
+                f"Check/record name mismatch: expected {check.name!r}, "
+                f"got {record.get('name')!r}"
+            )
+
     applicable = [
         (check, record)
-        for check, record in zip(checks, records, strict=True)
+        for check, record in paired
         if profile in check.profiles and check.required
     ]
 
