@@ -68,7 +68,8 @@ class OutboxStore:
             )
         claimed = self._conn.execute(
             (
-                f"SELECT * FROM outbox WHERE id IN ({','.join('?' * len(ids))})"
+                # nosec B608 - Amand: Menggunakan parameter binding (?), bukan string interpolation
+                f"SELECT * FROM outbox WHERE id IN ({','.join('?' * len(ids))})"  # nosec B608
                 if ids
                 else "SELECT * FROM outbox WHERE 0"
             ),
