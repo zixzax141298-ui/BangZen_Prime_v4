@@ -246,76 +246,67 @@ class TestWriteReport(unittest.TestCase):
 
 class TestMain(unittest.TestCase):
     def test_successful_gate_returns_zero(self):
-        with patch("tools.ci.build_checks", return_value=[]):
-            with patch(
-                "tools.ci.evaluate_gate",
-                return_value=("LOCAL PASS", "FULL CI NOT RUN", True),
-            ):
-                with patch(
-                    "tools.ci.build_report",
-                    return_value={
-                        "counts": {
-                            "PASS": 2,
-                            "FAIL": 0,
-                            "BLOCKED": 0,
-                            "NOT RUN": 0,
-                        }
-                    },
-                ):
-                    with patch("tools.ci.write_report", return_value=None):
-                        self.assertEqual(
-                            main(["--profile", "termux", "--report", ""]),
-                            0,
-                        )
+        with patch("tools.ci.build_checks", return_value=[]), patch(
+            "tools.ci.evaluate_gate",
+            return_value=("LOCAL PASS", "FULL CI NOT RUN", True),
+        ), patch(
+            "tools.ci.build_report",
+            return_value={
+                "counts": {
+                    "PASS": 2,
+                    "FAIL": 0,
+                    "BLOCKED": 0,
+                    "NOT RUN": 0,
+                }
+            },
+        ), patch("tools.ci.write_report", return_value=None):
+            self.assertEqual(
+                main(["--profile", "termux", "--report", ""]),
+                0,
+            )
 
     def test_failed_gate_returns_one(self):
-        with patch("tools.ci.build_checks", return_value=[]):
-            with patch(
-                "tools.ci.evaluate_gate",
-                return_value=("NOT GREEN", "FULL CI FAIL OR INCOMPLETE", False),
-            ):
-                with patch(
-                    "tools.ci.build_report",
-                    return_value={
-                        "counts": {
-                            "PASS": 0,
-                            "FAIL": 1,
-                            "BLOCKED": 0,
-                            "NOT RUN": 0,
-                        }
-                    },
-                ):
-                    with patch("tools.ci.write_report", return_value=None):
-                        self.assertEqual(
-                            main(["--profile", "github", "--report", ""]),
-                            1,
-                        )
+        with patch("tools.ci.build_checks", return_value=[]), patch(
+            "tools.ci.evaluate_gate",
+            return_value=("NOT GREEN", "FULL CI FAIL OR INCOMPLETE", False),
+        ), patch(
+            "tools.ci.build_report",
+            return_value={
+                "counts": {
+                    "PASS": 0,
+                    "FAIL": 1,
+                    "BLOCKED": 0,
+                    "NOT RUN": 0,
+                }
+            },
+        ), patch("tools.ci.write_report", return_value=None):
+            self.assertEqual(
+                main(["--profile", "github", "--report", ""]),
+                1,
+            )
 
     def test_report_failure_returns_one(self):
-        with patch("tools.ci.build_checks", return_value=[]):
-            with patch(
-                "tools.ci.evaluate_gate",
-                return_value=("LOCAL PASS", "FULL CI NOT RUN", True),
-            ):
-                with patch(
-                    "tools.ci.build_report",
-                    return_value={
-                        "counts": {
-                            "PASS": 0,
-                            "FAIL": 0,
-                            "BLOCKED": 0,
-                            "NOT RUN": 0,
-                        }
-                    },
-                ):
-                    with patch(
-                        "tools.ci.write_report",
-                        side_effect=OSError("simulated report failure"),
-                    ):
-                        self.assertEqual(
-                            main(["--profile", "termux"]),
-                            1,
-                        )
+        with patch("tools.ci.build_checks", return_value=[]), patch(
+            "tools.ci.evaluate_gate",
+            return_value=("LOCAL PASS", "FULL CI NOT RUN", True),
+        ), patch(
+            "tools.ci.build_report",
+            return_value={
+                "counts": {
+                    "PASS": 0,
+                    "FAIL": 0,
+                    "BLOCKED": 0,
+                    "NOT RUN": 0,
+                }
+            },
+        ), patch(
+            "tools.ci.write_report",
+            side_effect=OSError("simulated report failure"),
+        ):
+            self.assertEqual(
+                main(["--profile", "termux"]),
+                1,
+            )
 
 
 if __name__ == "__main__":

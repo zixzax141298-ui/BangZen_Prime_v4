@@ -1,0 +1,215 @@
+Metadata-Version: 2.4
+Name: bangzen-prime
+Version: 0.3.0
+Summary: Solana token intelligence: discovery, safety audit, scoring, signal-only alerts, paper execution. Live trading locked.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Provides-Extra: dashboard
+Requires-Dist: httpx>=0.27; extra == "dashboard"
+Requires-Dist: rich>=13; extra == "dashboard"
+Requires-Dist: python-dotenv>=1.0; extra == "dashboard"
+Requires-Dist: pyfiglet>=1.0; extra == "dashboard"
+Provides-Extra: intel
+Requires-Dist: httpx>=0.27; extra == "intel"
+Requires-Dist: defusedxml>=0.7; extra == "intel"
+Provides-Extra: ws
+Requires-Dist: websockets>=12; extra == "ws"
+Provides-Extra: wallet
+Requires-Dist: base58>=2.1; extra == "wallet"
+Requires-Dist: solders>=0.21; extra == "wallet"
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"
+Requires-Dist: coverage; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: defusedxml>=0.7; extra == "dev"
+Provides-Extra: security
+Requires-Dist: bandit; extra == "security"
+Requires-Dist: semgrep; extra == "security"
+Requires-Dist: pip-audit; extra == "security"
+Provides-Extra: safety
+Requires-Dist: safety>=3.0; extra == "safety"
+
+# BANGZEN PRIME
+
+Evidence-driven Solana token intelligence, risk analysis, signal generation, and paper-trading research.
+
+> **Safety boundary:** default operation is read-only and paper-only. Live signing and transaction broadcast remain locked. This software does not guarantee profit or prevent losses.
+
+## Purpose
+
+BANGZEN PRIME collects and validates Solana market/chain evidence, evaluates token and liquidity risk, generates explainable signals, and tests strategies through historical replay and paper trading. It prioritizes evidence quality and net outcomes after fees, slippage, price impact, priority fees/tips, and realistic exit assumptions—not raw signal count.
+
+## Repository map
+
+| Path | Responsibility |
+|---|---|
+| `AI_RULES.yaml` | Machine-readable project constitution |
+| `AGENTS.md`, `RULES.md`, `SECURITY.md` | Agent, engineering, and security rules |
+| `bangzen_prime/domain/` | Domain models and deterministic rules |
+| `bangzen_prime/application/` | Use cases and orchestration |
+| `bangzen_prime/infrastructure/` | Providers, persistence, and external I/O |
+| `bangzen_prime/execution/` | Read-only/simulated execution boundary |
+| `bangzen_prime/interfaces/` | User interfaces and commands |
+| `bangzen_prime/bootstrap.py` | Application composition root |
+| `tests/unit/`, `tests/integration/`, `tests/e2e/` | Automated tests |
+| `scripts/` | Test and maintenance scripts |
+| `tools/ci.py` | Portable validation gate |
+| `native/rust/` | Optional native Rust component |
+| `docs/` | Architecture, testing, security, and operations |
+
+## Requirements
+
+- Python 3.11 or newer and Git.
+- Internet access to install dependencies and query configured providers.
+- Rust/Cargo for native validation.
+- Docker and a configured model provider for local Strix scans.
+
+## Termux installation
+
+Termux is suitable for portable Python checks. It is not a substitute for Linux VPS when Docker-based tools or native security scanners are required.
+
+```bash
+pkg update && pkg upgrade
+pkg install python git
+git clone YOUR_REPOSITORY_URL
+cd BangZenPrime-v3
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e .
+python3 tools/ci.py --profile termux
+```
+
+The Termux profile runs bytecode compilation and the canonical stdlib unittest suite. It does not claim that container/native security scanners passed.
+
+## VPS / Linux installation
+
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-venv python3-pip build-essential
+git clone YOUR_REPOSITORY_URL
+cd BangZenPrime-v3
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e ".[dev,security]"
+```
+
+Install Rust stable and cargo-audit for native checks. Generate the lockfile if absent:
+
+```bash
+cargo generate-lockfile --manifest-path native/rust/Cargo.toml
+cargo install cargo-audit --locked
+python3 tools/ci.py --profile vps
+```
+
+## Validation profiles
+
+Run from the repository root:
+
+| Command | Purpose |
+|---|---|
+| `python3 tools/ci.py --profile auto` | Detect Termux, GitHub Actions, or general host |
+| `python3 tools/ci.py --profile termux` | Portable Python checks |
+| `python3 tools/ci.py --profile vps` | Full Python and Rust checks when native manifest exists |
+| `python3 tools/ci.py --profile github` | Full GitHub Actions profile |
+| `python3 tools/ci.py --profile full` | Alias for github |
+
+Statuses:
+- **PASS** — command actually ran and returned zero.
+- **FAIL** — command ran and failed or timed out.
+- **BLOCKED** — required tool/file/prerequisite is missing.
+- **NOT RUN** — optional check was not executed.
+- **NOT APPLICABLE** — component is absent or irrelevant to the selected profile.
+
+Missing required tools must never be silently treated as PASS. JSON report: `reports/ci-report.json` (local/CI artifact, not source control).
+
+## Tests
+
+Canonical runner:
+
+```bash
+python scripts/run_tests.py
+python -m compileall -q bangzen_prime tests scripts tools
+```
+
+The canonical project suite uses stdlib unittest. Pytest is available for future pytest-specific tests, but do not run the same unittest suite twice and count duplicated execution as extra coverage.
+
+## Development and security dependencies
+
+Portable development tools:
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+Additional security scanners on supported Linux/VPS:
+
+```bash
+python -m pip install -e ".[security]"
+```
+
+Runtime dependencies remain separate from development/security tooling. Install provider extras only for features you use.
+
+## BYOK — Bring Your Own Key
+
+Start from the placeholder-only example:
+
+```bash
+cp .env.example .env
+```
+
+Examples of provider variables include `BANGZEN_HELIUS_API_KEY`, `BANGZEN_BIRDEYE_API_KEY`, `BANGZEN_JUPITER_API_KEY`, `BANGZEN_ANTHROPIC_API_KEY`, `BANGZEN_OPENAI_API_KEY`, `BANGZEN_GROK_API_KEY`, and `BANGZEN_TELEGRAM_BOT_TOKEN`.
+
+1. Never commit `.env`.
+2. Never put API keys, seed phrases, or private keys in source, tests, logs, Telegram, or AI prompts.
+3. Use separate least-privilege credentials for development and production.
+4. Inject credentials only into the provider adapter that needs them.
+5. Store CI credentials in GitHub Actions Secrets when required.
+6. Rotate credentials if exposed.
+
+A public wallet address is not a private key, but it reveals on-chain activity; share it only when appropriate.
+
+## Strix security assessment
+
+Strix is an additional AI-assisted security assessment tool. It does **not** replace deterministic CI, unit/integration tests, static analysis, or dependency auditing.
+
+For local scanning, use a Linux VPS/workstation with Docker and an operator-owned LLM provider key. Follow current official instructions:
+- https://github.com/usestrix/strix
+- https://docs.strix.ai
+
+Example headless scan after installing/configuring Strix:
+
+```bash
+strix -n -t ./ --scan-mode standard --max-budget 10
+```
+
+Only scan repositories/systems you own or are authorized to test. Prefer a disposable clean checkout. Never expose wallet secrets, production credentials, or private keys to a scanner. Review findings and proposed changes before applying them.
+
+## GitHub Actions
+
+The workflow installs declared development/security tools and runs the same full validation gate. A runner provisioning failure before job steps execute is an infrastructure blocker—not a code pass or code failure.
+
+Do not make a paid scanner credential such as Safety API access a requirement for the portable core gate.
+
+## Security and execution boundary
+
+- Read-only market/chain data and paper/simulation workflows.
+- No private-key or seed-phrase storage in the repository.
+- No live transaction signing or broadcast.
+- AI recommendations are advisory.
+- Deterministic Risk/Safety retains final veto.
+- Missing, stale, partial, or conflicting safety evidence cannot be treated as safe.
+
+Read `AI_RULES.yaml`, `SECURITY.md`, and `RULES.md` before changing code.
+
+## Pull request requirements
+
+Every PR must state objective, base/head commits, changed files, actual validation commands/results, checks not run, known limitations, security impact, and Change Ledger. Never delete or weaken tests to make a gate green.
+
+## Risk notice
+
+Digital assets are volatile and can result in total loss. Backtests, scanners, AI models, and security checks cannot guarantee profit, safe execution, or protection against market manipulation.

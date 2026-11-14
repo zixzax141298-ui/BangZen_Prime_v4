@@ -57,12 +57,11 @@ class DatabaseFailureTest(unittest.TestCase):
         db = Database(":memory:")
         db.migrate()
         uow = UnitOfWork(db)
-        with self.assertRaises(KeyboardInterrupt):
-            with uow.begin() as repos:
-                repos.tokens.upsert(
-                    Token(chain="solana", mint=TOKEN_MINT, symbol="T"), START
-                )
-                raise KeyboardInterrupt()
+        with self.assertRaises(KeyboardInterrupt), uow.begin() as repos:
+            repos.tokens.upsert(
+                Token(chain="solana", mint=TOKEN_MINT, symbol="T"), START
+            )
+            raise KeyboardInterrupt()
         self.assertIsNone(db.query_one("SELECT 1 FROM tokens"))
 
     def test_integrity_errors_are_not_masked(self):
