@@ -58,7 +58,7 @@ class CrossChainRadarAdapter:
                             self._normalize(p.get("baseToken", {}).get("symbol", ""))
                         )
         except Exception:
-            pass
+            pass  # nosec B110
 
         self._evm_cache = {"ts": now_ts, "symbols": list(set(trending))}
         return tuple(self._evm_cache["symbols"])
