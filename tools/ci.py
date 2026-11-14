@@ -1,3 +1,4 @@
+
 """Portable, fail-closed validation gate for BANGZEN PRIME."""
 
 from __future__ import annotations
@@ -18,8 +19,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-FULL_PROFILES = ("vps", "github")
-ALL_PROFILES = ("termux", *FULL_PROFILES)
+ALL_PROFILES = ("termux", "vps", "github")
 
 PYTHON_PATHS = tuple(
     path
@@ -28,6 +28,7 @@ PYTHON_PATHS = tuple(
 )
 
 RUST_MANIFEST = ROOT / "native" / "rust" / "Cargo.toml"
+RUST_LOCKFILE = ROOT / "native" / "rust" / "Cargo.lock"
 
 
 @dataclass(frozen=True)
@@ -37,14 +38,14 @@ class Check:
     executable: str | None = None
     required: bool = True
     required_path: str | None = None
-    profiles: tuple[str, ...] = FULL_PROFILES
+    profiles: tuple[str, ...] = ALL_PROFILES
 
 
 def resolve_profile(
     requested: str,
     environ: dict[str, str] | None = None,
 ) -> str:
-    """Resolve the execution profile without assuming a Linux distribution."""
+    """Resolve automatic profile selection."""
     env = os.environ if environ is None else environ
 
     if requested != "auto":
@@ -60,7 +61,7 @@ def resolve_profile(
 
 
 def python_checks() -> list[Check]:
-    """Return Python checks, separating portable tests from full CI tools."""
+    """Build Python validation checks."""
     checks = [
         Check(
             name="Compile",
@@ -71,13 +72,11 @@ def python_checks() -> list[Check]:
                 "-q",
                 *PYTHON_PATHS,
             ),
-            profiles=ALL_PROFILES,
         ),
         Check(
             name="Canonical unittest suite",
             command=(sys.executable, "scripts/run_tests.py"),
             required_path="scripts/run_tests.py",
-            profiles=ALL_PROFILES,
         ),
     ]
 
@@ -93,6 +92,7 @@ def python_checks() -> list[Check]:
                         "--check",
                         *PYTHON_PATHS,
                     ),
+                    profiles=("vps", "github"),
                 ),
                 Check(
                     name="Ruff",
@@ -103,6 +103,7 @@ def python_checks() -> list[Check]:
                         "check",
                         *PYTHON_PATHS,
                     ),
+                    profiles=("vps", "github"),
                 ),
                 Check(
                     name="Mypy",
@@ -113,6 +114,7 @@ def python_checks() -> list[Check]:
                         "bangzen_prime",
                     ),
                     required_path="bangzen_prime",
+                    profiles=("vps", "github"),
                 ),
                 Check(
                     name="Bandit",
@@ -125,6 +127,7 @@ def python_checks() -> list[Check]:
                         "bangzen_prime",
                     ),
                     required_path="bangzen_prime",
+                    profiles=("vps", "github"),
                 ),
                 Check(
                     name="Semgrep",
@@ -138,6 +141,7 @@ def python_checks() -> list[Check]:
                     ),
                     executable="semgrep",
                     required_path="bangzen_prime",
+                    profiles=("vps", "github"),
                 ),
                 Check(
                     name="Pip-Audit",
@@ -147,62 +151,67 @@ def python_checks() -> list[Check]:
                         "--skip-editable",
                     ),
                     executable="pip-audit",
+                    profiles=("vps", "github"),
                 ),
             ]
         )
 
     return checks
+
+
+def rust_checks() -> list[Check]:
+    """Build Rust checks when the Rust project exists."""
+    if not RUST_MANIFEST.is_file():
+        return []
+
+    return [
+        Check(
+            name="Cargo fmt",
+            command=(
+                "cargo",
+                "fmt",
+                "--manifest-path",
+                "native/rust/Cargo.toml",
+                "--",
+                "--check",
+            ),
+            executable="cargo",
+            profiles=("vps", "github"),
+        ),
+        Check(
+            name="Cargo test",
+            command=(
+                "cargo",
+                "test",
+                "--locked",
+                "--manifest-path",
+                "native/rust/Cargo.toml",
+            ),
+            executable="cargo",
+            required_path="native/rust/Cargo.lock",
+            profiles=("vps", "github"),
+        ),
+        Check(
+            name="Cargo Audit",
+            command=(
+                "cargo",
+                "audit",
+                "--file",
+                "native/rust/Cargo.lock",
+            ),
+            executable="cargo",
+            required_path="native/rust/Cargo.lock",
+            profiles=("vps", "github"),
+        ),
+    ]
 
 
 def build_checks(profile: str) -> list[Check]:
-    """Build the complete check inventory for the selected profile."""
-    checks = python_checks()
-
-    if RUST_MANIFEST.is_file():
-        checks.extend(
-            [
-                Check(
-                    name="Cargo fmt",
-                    command=(
-                        "cargo",
-                        "fmt",
-                        "--manifest-path",
-                        "native/rust/Cargo.toml",
-                        "--",
-                        "--check",
-                    ),
-                    executable="cargo",
-                ),
-                Check(
-                    name="Cargo test",
-                    command=(
-                        "cargo",
-                        "test",
-                        "--manifest-path",
-                        "native/rust/Cargo.toml",
-                    ),
-                    executable="cargo",
-                ),
-                Check(
-                    name="Cargo Audit",
-                    command=(
-                        "cargo",
-                        "audit",
-                        "--file",
-                        "native/rust/Cargo.lock",
-                    ),
-                    executable="cargo",
-                    required_path="native/rust/Cargo.lock",
-                ),
-            ]
-        )
-
-    # Keep the profile argument explicit. Checks outside the selected
-    # profile remain visible in the report as NOT RUN.
+    """Build complete check inventory."""
     if profile not in ALL_PROFILES:
         raise ValueError(f"Unsupported profile: {profile}")
 
-    return checks
+    return python_checks() + rust_checks()
 
 
 def skipped_record(check: Check, profile: str) -> dict[str, Any]:
@@ -213,12 +222,16 @@ def skipped_record(check: Check, profile: str) -> dict[str, Any]:
         "status": "NOT RUN",
         "exit_code": None,
         "duration_seconds": 0.0,
-        "detail": f"Not included in the {profile} profile",
+        "detail": f"Not included in {profile} profile",
     }
 
 
-def run_check(check: Check, timeout: int, profile: str) -> dict[str, Any]:
-    """Run one check and return a machine-readable result."""
+def run_check(
+    check: Check,
+    timeout: int,
+    profile: str,
+) -> dict[str, Any]:
+    """Run one check and capture its result."""
     if profile not in check.profiles:
         return skipped_record(check, profile)
 
@@ -307,7 +320,7 @@ def evaluate_gate(
     checks: list[Check],
     records: list[dict[str, Any]],
 ) -> tuple[str, str, bool]:
-    """Evaluate only applicable required checks; never treat NOT RUN as PASS."""
+    """Fail closed when any applicable required check does not pass."""
     applicable = [
         (check, record)
         for check, record in zip(checks, records, strict=True)
@@ -342,7 +355,10 @@ def build_report(
 ) -> dict[str, Any]:
     statuses = ("PASS", "FAIL", "BLOCKED", "NOT RUN")
     counts = {
-        status: sum(record["status"] == status for record in records)
+        status: sum(
+            record["status"] == status
+            for record in records
+        )
         for status in statuses
     }
 
@@ -362,24 +378,25 @@ def build_report(
     }
 
 
-def write_report(report_path: str, report: dict[str, Any]) -> Path | None:
-    """Write the report atomically and only inside the repository."""
+def write_report(
+    report_path: str,
+    report: dict[str, Any],
+) -> Path | None:
+    """Atomically write a report inside the repository."""
     if not report_path:
         return None
 
     requested = Path(report_path)
 
     if requested.is_absolute():
-        raise ValueError("Report path must be relative to the repository")
+        raise ValueError("Report path must be repository-relative")
 
     target = (ROOT / requested).resolve()
-    root_resolved = ROOT.resolve()
 
-    if not target.is_relative_to(root_resolved):
-        raise ValueError("Report path must remain inside the repository")
+    if not target.is_relative_to(ROOT.resolve()):
+        raise ValueError("Report path must remain inside repository")
 
     target.parent.mkdir(parents=True, exist_ok=True)
-
     temporary_path: Path | None = None
 
     try:
@@ -410,6 +427,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="BANGZEN PRIME portable CI gate"
     )
+
     parser.add_argument(
         "--profile",
         choices=("auto", "termux", "vps", "github", "full"),
@@ -465,12 +483,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         report_file = write_report(args.report, report)
     except (OSError, ValueError) as exc:
         print(
-            f"\nREPORT FAILURE: {type(exc).__name__}: {exc}",
+            f"REPORT FAILURE: {type(exc).__name__}: {exc}",
             file=sys.stderr,
         )
         return 1
 
     print("\n=== GATE SUMMARY ===")
+
     for status, count in report["counts"].items():
         print(f"{status.replace(' ', '_')}={count}")
 
