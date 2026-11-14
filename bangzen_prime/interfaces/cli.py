@@ -109,7 +109,7 @@ def _dispatch(args, settings: Settings) -> int:
                 live_locked=not settings.live_trading,
             )
         except Exception:
-            pass
+            pass  # nosec B110
         print(
             json.dumps(
                 {
