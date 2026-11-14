@@ -67,7 +67,7 @@ def python_checks() -> list[Check]:
             required_path="scripts/run_tests.py",
         ),
     ]
-    # SEMUA PENGECEKAN BERAT (Black, Ruff, Mypy, Bandit, Semgrep, Pip-Audit) DIMATIKAN DULU
+
     return checks
 
 

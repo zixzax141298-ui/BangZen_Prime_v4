@@ -33,7 +33,7 @@ class SeededMarket:
     """Random walk with a seeded RNG. Responds to DexScreener and RugCheck URL shapes."""
 
     def __init__(self, seed: int) -> None:
-        self._rng = random.Random(seed)
+        self._rng = random.Random(seed)  # nosec B311
         self.price = 1.0
         self.last_pair_price = 1.0
 

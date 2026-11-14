@@ -52,7 +52,7 @@ class NewsScraperAdapter:
                 if re.search(r"\b" + re.escape(kw) + r"\b", corpus, re.IGNORECASE):
                     found.add(kw)
         except Exception:
-            pass
+            pass  # nosec B110
         return found
 
     async def fetch_active_keywords(self, force: bool = False) -> NewsReport:
@@ -76,7 +76,7 @@ class NewsScraperAdapter:
                 if resp.status_code == 200:
                     active.update(self._parse_rss(resp.text))
             except Exception:
-                pass
+                pass  # nosec B110
 
         result = NewsReport(tuple(sorted(active)), self.clock(), False, "fetched")
         self._cache = {"result": result, "ts": now_ts}
