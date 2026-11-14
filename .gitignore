@@ -17,3 +17,6 @@ reports/
 .env
 .DS_Store
 native/rust/target/
+*.db*
+*.egg-info/
+.env

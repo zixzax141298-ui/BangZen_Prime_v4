@@ -1,2 +1,0 @@
-[console_scripts]
-bangzen-prime = bangzen_prime.__main__:main
