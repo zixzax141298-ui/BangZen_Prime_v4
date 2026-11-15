@@ -22,3 +22,4 @@ native/rust/target/
 .env
 build/
 bangzen-v2-main/
+bangzen_prime_backup_*/
