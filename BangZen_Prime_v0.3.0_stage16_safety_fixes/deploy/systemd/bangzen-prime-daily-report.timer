@@ -1,0 +1,14 @@
+# Jadwal laporan harian: 00:10 UTC setiap hari. Laporan merangkum hari UTC sebelumnya,
+# yang sudah selesai pada jam ini.
+# Persistent=true menjalankan ulang satu kali jika VPS mati saat jadwal. Hanya hari terakhir
+# yang dikirim, bukan semua hari yang terlewat. Pengiriman ulang aman karena ada dedup.
+[Unit]
+Description=BangZen Prime daily paper report timer (00:10 UTC)
+
+[Timer]
+OnCalendar=*-*-* 00:10:00 UTC
+Persistent=true
+Unit=bangzen-prime-daily-report.service
+
+[Install]
+WantedBy=timers.target

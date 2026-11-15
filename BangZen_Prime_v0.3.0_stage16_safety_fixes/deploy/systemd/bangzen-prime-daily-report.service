@@ -1,0 +1,28 @@
+# Template unit oneshot untuk laporan harian. Dipicu oleh bangzen-prime-daily-report.timer.
+# Placeholder: __APP_USER__, __APP_DIR__, __VENV_DIR__. Paper only. Live dan broadcast dikunci di kode.
+[Unit]
+Description=BangZen Prime daily paper report (Telegram, dedup, at-least-once)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__APP_USER__
+WorkingDirectory=__APP_DIR__
+# Kill switch and env file use absolute paths, so the working directory cannot hide them.
+Environment=BANGZEN_ENV_FILE=__APP_DIR__/.env
+Environment=BANGZEN_HALT_FLAG_PATH=__APP_DIR__/HALT.flag
+ExecStart=__VENV_DIR__/bin/bangzen-prime daily-report --send
+TimeoutStartSec=300
+StandardOutput=journal
+StandardError=journal
+
+# Pengerasan sama dengan unit monitor. Belum diuji di VPS nyata.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=__APP_DIR__
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+RestrictSUIDSGID=yes

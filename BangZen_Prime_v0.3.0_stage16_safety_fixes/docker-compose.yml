@@ -1,0 +1,42 @@
+# Paper-only deployment. Live trading is locked in code; there is no signing or broadcast path.
+# Place your watchlist at ./data/watchlist.txt (one Solana mint per line) before starting.
+services:
+  bangzen-prime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bangzen-prime-bot
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    # The image default CMD is `status`, which exits immediately. With restart: unless-stopped
+    # that would loop forever, so the service runs the monitor explicitly.
+    command:
+      [
+        "python", "-m", "bangzen_prime", "monitor",
+        "--watchlist", "/app/data/watchlist.txt",
+        "--interval-seconds", "60",
+      ]
+
+    # Keep the database on the mounted volume. Without this it lived inside the container
+    # and was lost whenever the container was recreated.
+    environment:
+      BANGZEN_DB_PATH: /app/data/bangzen.db
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

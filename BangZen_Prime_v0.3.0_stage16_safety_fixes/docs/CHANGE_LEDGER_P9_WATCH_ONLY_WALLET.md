@@ -1,0 +1,26 @@
+# Change Ledger — P9 Watch-Only Wallet Registry
+
+- Objective: register a public Solana address without accepting or retaining wallet secrets, and make wallet fund/signing access explicitly fail closed.
+- Base branch: `feat/p8-verified-telegram-signal-payload`
+- Base SHA: `f3dd4464cfe78774972abf93bf73d572861083a2`
+- Head branch: `feat/p9-watch-only-wallet-registry`
+- Head SHA: record final branch head from GitHub after the last commit.
+- Files added:
+  - `bangzen_prime/application/wallet_access.py`
+  - `tests/unit/test_wallet_access.py`
+  - `docs/decisions/ADR-0005-watch-only-wallet-registry.md`
+  - `docs/CHANGE_LEDGER_P9_WATCH_ONLY_WALLET.md`
+- Files modified:
+  - `bangzen_prime/settings.py`: optional `BANGZEN_WALLET_PUBLIC_ADDRESS`, syntax validation, and repr redaction.
+  - `bangzen_prime/bootstrap.py`: compose wallet registry and access controller into Container.
+  - `.env.example`: public address placeholder only.
+  - `tests/unit/test_settings.py`: valid/invalid address and repr redaction coverage.
+  - `docs/CONFIGURATION.md`: public-only configuration guidance.
+  - `docs/OPERATING_MODES_AND_EXECUTION_LOCK.md`: watch-only and external funding semantics.
+- Security: registry accepts public address only; no private key, seed phrase, signer, balance, or transaction data API. Wallet address is redacted from repr. Signer and fund-use assertions always deny.
+- Mode behavior: even HYBRID and EXECUTION_ONLY cannot unlock signer or funds; emergency stop is included in denial reason codes.
+- Important limitation: external deposits to the public address remain possible on-chain regardless of app mode. This release cannot freeze or block them and never uses the funds.
+- Tests: NOT RUN in this authoring session. Intended command: `python -m unittest tests.unit.test_wallet_access tests.unit.test_settings`.
+- CI: `python3 tools/ci.py` NOT RUN.
+- Static/security scans: NOT RUN.
+- Merge: not merged; PR #56 and earlier stack are dependencies.

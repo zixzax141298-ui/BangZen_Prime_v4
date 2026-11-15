@@ -1,0 +1,33 @@
+# Change Ledger — P7 Mode-Aware Telegram Signal Gateway
+
+- Objective: apply the selected operating mode to outbound signal delivery and add a strict allowlisted Telegram notifier.
+- Base branch: `security/p6-remove-plaintext-burner-wallet`
+- Base SHA: `8c641be1f110695f4a1c564f1af3aba43ee362cd`
+- Head branch: `feat/p7-mode-aware-telegram-gateway`
+- Head SHA: recorded from final GitHub branch metadata after the last commit.
+- Files added:
+  - `bangzen_prime/infrastructure/adapters/notifications/__init__.py`
+  - `bangzen_prime/infrastructure/adapters/notifications/telegram.py`
+  - `tests/unit/test_telegram_notifier.py`
+  - `tests/unit/test_mode_gated_notifications.py`
+  - `docs/TELEGRAM_SIGNAL_GATEWAY.md`
+  - `docs/decisions/ADR-0003-mode-aware-telegram-gateway.md`
+  - `docs/CHANGE_LEDGER_P7_MODE_AWARE_TELEGRAM.md`
+- Files modified:
+  - `bangzen_prime/settings.py`
+  - `bangzen_prime/application/notifications.py`
+  - `bangzen_prime/bootstrap.py`
+  - `.env.example`
+  - `docs/CONFIGURATION.md`
+  - `docs/OPERATING_MODES_AND_EXECUTION_LOCK.md`
+  - `tests/unit/test_settings.py`
+- Compatibility: adds `BANGZEN_OPERATING_MODE`; existing `BANGZEN_MODE=paper` remains unchanged and continues to control the paper-only execution environment.
+- Security: Telegram is outbound-only, allowlist-based, plain-text, timeout-bounded, and token-redacted. No inbound commands, wallet access, signer, or transaction path is added.
+- Mode semantics: Telegram delivery is gated by the mode controller. Execution and wallet access remain denied in all modes.
+- Known limitation: current signal event has only an internal token UUID and does not yet include mint, symbol, provenance, or observation timestamps. A separate event-contract PR is required before claiming a complete actionable signal format.
+- Tests: NOT RUN in this authoring session. Intended command: `python -m unittest tests.unit.test_telegram_notifier tests.unit.test_mode_gated_notifications tests.unit.test_settings`.
+- CI: `python3 tools/ci.py` NOT RUN in this session.
+- Static/security scans: NOT RUN.
+- Delivery: outbox is at-least-once; duplicate Telegram messages remain possible after uncertain delivery.
+- Live execution: remains locked; no signing or broadcast implementation is added.
+- Merge: not merged; owner review required.

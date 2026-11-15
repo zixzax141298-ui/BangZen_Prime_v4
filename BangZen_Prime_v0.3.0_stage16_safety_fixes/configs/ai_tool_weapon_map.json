@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "description": "Maps each AI-exposed tool to the weapon catalog entry it invokes. Every mapping must reference an ON_DEMAND_ANALYSIS_ONLY catalog weapon.",
+  "mappings": {
+    "check_sybil_cluster": "sybil_adapter",
+    "check_honeypot": "honeypot_adapter",
+    "check_smart_money_quality": "smart_money_engine",
+    "check_sequential_bundle": "sequential_bundle_detector",
+    "check_pre_dump_radar": "pre_dump_radar",
+    "score_metadata_narrative": "metadata_scorer",
+    "fetch_news_keywords": "news_adapter",
+    "check_cross_chain_copycat": "cross_chain_radar",
+    "check_autopsy_dna": "autopsy_engine"
+  }
+}

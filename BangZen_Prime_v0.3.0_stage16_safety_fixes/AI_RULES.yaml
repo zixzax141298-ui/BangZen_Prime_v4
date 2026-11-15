@@ -1,0 +1,227 @@
+schema_version: "1.0"
+project:
+  name: "BANGZEN PRIME"
+  constitution_version: "14.2-merged"
+  purpose: "Deterministic Solana trading infrastructure with event-driven AI research capability."
+  objective: "Maximize evidence-backed net expectancy while controlling drawdown; never promise profit."
+  network: "Solana"
+  default_operating_mode: "read_only_and_paper"
+
+authority:
+  precedence:
+    - "AI_RULES.yaml"
+    - "SECURITY.md"
+    - "RULES.md"
+    - "AGENTS.md"
+    - "BANGZEN_STRATEGIC_CONSTITUTION.md"
+    - "BANGZEN_PRIME_MASTER_BLUEPRINT_2026.md"
+    - "docs/architecture/*"
+    - "docs/*"
+    - "code_and_tests"
+  conflict_policy: "Stop the affected work, report the conflict, and request owner clarification. Never silently weaken a higher-level rule."
+  owner_approval_required_for:
+    - "Enabling live trading, signing, or transaction broadcast"
+    - "Changing risk limits, safety thresholds, or emergency-stop semantics"
+    - "Changing the evidence contract or AI decision authority"
+    - "Adding a secret-bearing provider or wallet capability"
+    - "Deleting, bypassing, or materially weakening tests or security controls"
+
+operating_modes:
+  read_only:
+    allowed: ["Market data reads", "Chain data reads", "Evidence validation", "Alerts"]
+    transaction_signing: false
+    transaction_broadcast: false
+  paper:
+    allowed: ["Simulated orders", "Simulated fills", "Fee and slippage modelling", "Position lifecycle tests"]
+    transaction_signing: false
+    transaction_broadcast: false
+  live:
+    enabled: false
+    default: false
+    requires:
+      - "Explicit written owner authorization for the specific change"
+      - "Independent security review"
+      - "Risk and execution tests with documented evidence"
+      - "Verified transaction simulation and reconciliation"
+      - "A tested emergency-stop and rollback procedure"
+      - "A separate approved implementation PR"
+    note: "No implementation or configuration may infer live authorization from a general request to improve the bot."
+
+non_negotiable_safety:
+  fail_closed: true
+  missing_or_stale_data: "UNAVAILABLE"
+  contradictory_sources: "CONFLICTED"
+  insufficient_evidence_decision: "HOLD"
+  ai_can_override_risk_veto: false
+  ai_can_access_secrets: false
+  ai_can_sign_transactions: false
+  ai_can_broadcast_transactions: false
+  private_key_or_seed_phrase_in_repository: forbidden
+  secrets_in_logs_or_telegram: forbidden
+  disabling_security_checks_to_increase_signal_count: forbidden
+  bypassing_halt_flag_or_emergency_stop: forbidden
+  halt_flag:
+    path: "HALT.flag"
+    status: "IMPLEMENTED"  # risk/emergency_stop.py, stage 1 (owner-approved 2026-11-15)
+    effect: "When the file exists, every process that can produce a trading decision must stop before deciding. The Risk Engine must treat it as an emergency stop."
+  fabricated_test_or_ci_claims: forbidden
+
+architecture:
+  fast_path: # V13.0 Trading Engine
+    ai_dependency: false
+    stages:
+      - "Ingest market and transaction events"
+      - "Persist raw event and source provenance"
+      - "Normalize and validate evidence"
+      - "Run registered deterministic strategy (FENRIR)"
+      - "Run deterministic constraints and Risk Engine veto"
+      - "Pass to authorized execution interface"
+      - "Publish confirmed transaction lifecycle event to research queue"
+  slow_path: # V14.2 AI Research Analyst
+    event_driven: true
+    stages:
+      - "Consume confirmed transaction lifecycle event"
+      - "Build immutable, minimized evidence snapshot"
+      - "Deduplicate and enqueue research job"
+      - "Select one eligible AI provider"
+      - "Run bounded research request"
+      - "Validate schema, evidence references, and policy"
+      - "Persist report and quality-evaluation record"
+  principles:
+    - "Domain logic has no network or persistence side effects."
+    - "Application orchestration depends on ports, not concrete providers."
+    - "Infrastructure adapters own external I/O and secret handling."
+    - "bootstrap.py is the composition root."
+    - "Risk and Safety is deterministic, isolated, and has final veto."
+    - "Provider data is untrusted input until validated and normalized."
+
+ai_research_boundary: # V14.2 Rules
+  allowed:
+    - "Analyze approved market and on-chain evidence."
+    - "Compare pre-event and post-event market snapshots."
+    - "Identify missing, stale, incomplete, anomalous, or conflicting evidence."
+  forbidden:
+    - "Make BUY, SELL, HOLD, EXECUTE decisions."
+    - "Calculate, estimate, discuss, or optimize net profit."
+    - "Analyze, classify, or discuss wins, losses, or trade outcomes."
+    - "Override deterministic controls."
+
+ai_router: # V14.2 9-Provider Fallback
+  mode: "SINGLE_ACTIVE_PROVIDER_PRIORITY_FALLBACK"
+  provider_slots: 9
+  concurrent_providers_per_job: 1
+  providers:
+    - {id: "openai", priority: 1, enabled: true}
+    - {id: "anthropic", priority: 2, enabled: true}
+    - {id: "xai", priority: 3, enabled: true}
+    - {id: "google", priority: 4, enabled: true}
+    - {id: "deepseek", priority: 5, enabled: true}
+    - {id: "qwen", priority: 6, enabled: true}
+    - {id: "mistral", priority: 7, enabled: true}
+    - {id: "provider_8", priority: 8, enabled: false}
+    - {id: "provider_9", priority: 9, enabled: false}
+  limits:
+    provider_timeout_seconds: 8
+    total_job_deadline_seconds: 25
+
+evidence_contract: # V13.0 Evidence Rules
+  required_fields:
+    - "schema_version"
+    - "subject"
+    - "observed_at"
+    - "received_at"
+    - "source"
+    - "source_record_id"
+    - "freshness"
+    - "completeness"
+    - "validation_status"
+    - "confidence_basis"
+    - "reason_codes"
+  allowed_validation_status:
+    - "VERIFIED"
+    - "PARTIAL"
+    - "UNAVAILABLE"
+    - "CONFLICTED"
+    - "REJECTED"
+  rules:
+    - "A provider response is an observation, not proof of safety."
+    - "PARTIAL, UNAVAILABLE, CONFLICTED, or REJECTED evidence cannot satisfy a hard safety gate."
+    - "Never treat missing values as zero, false, safe, or passed."
+    - "Every decision must be reproducible from stored evidence and policy version where practical."
+
+risk_policy: # V13.0 Risk Engine
+  authority: "Deterministic Risk/Safety module"
+  veto_is_final: true
+  net_risk_must_include:
+    - "Entry and exit fees"
+    - "Expected slippage"
+    - "Price impact"
+    - "Priority or tip costs when applicable"
+  thresholds_change_requires: "Owner approval, rationale, tests, and a Change Ledger entry."
+  no_guaranteed_profit_claims: true
+
+engineering:
+  change_policy:
+    - "One coherent objective per pull request."
+    - "Prefer additive, reversible changes."
+    - "Do not combine governance, strategy, and execution changes in one PR."
+  testing:
+    required: true
+    preserve_existing_tests: true
+    no_test_weakening: true
+    required_gate: "python3 tools/ci.py"
+    # Transition clause revised to match Master Blueprint 2026 (no CI bypass).
+    integration_phase_policy: 
+      status: "NO_BYPASS"
+      rule: "Failing tests must not be skipped, deleted, or bypassed in CI to obtain a green result. A legacy failure is fixed in the PR, or documented in the PR description and Change Ledger with an explicit owner exception. Master Blueprint 2026 section 20.1 applies."
+      required_action: "Record every failing check with its exact result. Do not convert a failure into PASS."
+    done_definition: "Do not call a change DONE until the required gate is fully green (or bypassed under the Integration Phase Policy) and evidence is recorded."
+  auditability:
+    change_ledger_required: true
+    record_base_and_head_sha: true
+    record_tests_and_unrun_checks: true
+    record_known_limitations: true
+
+repository_layout:
+  root_policy_files:
+    - "AI_RULES.yaml"
+    - "RULES.md"
+    - "AGENTS.md"
+    - "SECURITY.md"
+  source_of_truth:
+    domain: "bangzen_prime/domain"
+    application: "bangzen_prime/application"
+    infrastructure: "bangzen_prime/infrastructure"
+    execution: "bangzen_prime/execution"
+    interfaces: "bangzen_prime/interfaces"
+    composition_root: "bangzen_prime/bootstrap.py"
+  placement_rules:
+    - "Do not create a second implementation of an existing domain capability in a different layer."
+    - "Provider-specific code belongs in infrastructure/adapters."
+    - "Pure deterministic policy belongs in domain or the dedicated risk boundary."
+
+release_controls:
+  pull_request_required: true
+  merge_requires_owner_approval: true
+  live_release_requires_separate_approval: true
+
+status_vocabulary:
+  PASS: "The exact check was run and passed."
+  FAIL: "The exact check was run and failed."
+  NOT_RUN: "The check was not executed."
+  BLOCKED: "The check could not execute because a prerequisite was unavailable."
+
+master_blueprint_alignment: # Master Blueprint 2026 (binding for structure and workflow)
+  document: "BANGZEN_PRIME_MASTER_BLUEPRINT_2026.md"
+  precedence_note: "The constitution v14.2 and this file prevail over the blueprint on any conflict. Conflicts are reported to the owner, not resolved silently."
+  structure:
+    status: "MANDATORY_AS_LOGICAL_MAP"
+    rule: "New capability is placed by the mapping in docs/STRUCTURE_MAPPING_2026.md. Physical placement follows the blueprint section 15 layout (core, data, discovery, security, market, strategies, scoring, risk, execution, notifications, analytics, research, storage) after the owner-approved migration (stage 5, 2026-11-15). No new top-level folder without owner approval."
+  ai_outcome_analysis:
+    status: "PROHIBITED_FOR_AI"
+    rule: "Blueprint section 14 items that summarise outcomes, compare strategy performance, or explain performance are performed by deterministic analytics (blueprint sections 18 and 14.1 steps not involving AI). AI receives no PnL or outcome data."
+  environment_names:
+    rule: "Blueprint names (HELIUS_API_KEY, TELEGRAM_CHAT_ID, and so on) are logical names. The implemented variables use the BANGZEN_ prefix, for example BANGZEN_HELIUS_API_KEY and BANGZEN_TELEGRAM_ALLOWED_CHAT_IDS. Mapping is in docs/STRUCTURE_MAPPING_2026.md."
+  quality_tools:
+    rule: "The required gate is python3 tools/ci.py. Blueprint tools (Black, Ruff, Mypy, Bandit, Semgrep, Safety, Pip-Audit) are required only after they are listed in tools/ci.py. Until then they are reported as NOT_RUN, never PASS."
+    test_runner: "stdlib unittest is canonical. Pytest is optional for new tests and must not run the same tests twice."

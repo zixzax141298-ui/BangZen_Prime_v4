@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "max_selected_weapons": 1,
+  "phases": {
+    "UNKNOWN": [],
+    "PUMPFUN_LAUNCH": [
+      {"weapon_id": "sequential_bundle_detector", "required_evidence": ["launch_transactions", "funding_graph"], "priority": 100},
+      {"weapon_id": "sybil_adapter", "required_evidence": ["funding_graph", "holder_distribution"], "priority": 90},
+      {"weapon_id": "honeypot_adapter", "required_evidence": ["token_authority", "transaction_simulation"], "priority": 80}
+    ],
+    "BONDING_CURVE": [
+      {"weapon_id": "sequential_bundle_detector", "required_evidence": ["launch_transactions", "funding_graph"], "priority": 100},
+      {"weapon_id": "pre_dump_radar", "required_evidence": ["curve_state", "swap_flow", "dev_wallet_flow"], "priority": 95},
+      {"weapon_id": "sybil_adapter", "required_evidence": ["funding_graph", "holder_distribution"], "priority": 90}
+    ],
+    "MIGRATION": [
+      {"weapon_id": "lp_sniper_adapter", "required_evidence": ["migration_event", "pool_state", "liquidity_snapshot"], "priority": 110},
+      {"weapon_id": "pre_dump_radar", "required_evidence": ["curve_state", "swap_flow", "liquidity_snapshot"], "priority": 100},
+      {"weapon_id": "sybil_adapter", "required_evidence": ["funding_graph", "holder_distribution"], "priority": 90}
+    ],
+    "RAYDIUM_POOL": [
+      {"weapon_id": "lp_sniper_adapter", "required_evidence": ["pool_state", "lp_ownership", "liquidity_snapshot"], "priority": 110},
+      {"weapon_id": "honeypot_adapter", "required_evidence": ["token_authority", "transaction_simulation"], "priority": 100},
+      {"weapon_id": "sybil_adapter", "required_evidence": ["funding_graph", "holder_distribution"], "priority": 90}
+    ],
+    "RAYDIUM_EARLY": [
+      {"weapon_id": "pre_dump_radar", "required_evidence": ["liquidity_snapshot", "swap_flow", "dev_wallet_flow"], "priority": 110},
+      {"weapon_id": "sybil_adapter", "required_evidence": ["funding_graph", "holder_distribution"], "priority": 100},
+      {"weapon_id": "kol_exit_adapter", "required_evidence": ["wallet_flow", "swap_flow"], "priority": 90}
+    ],
+    "GROWTH": [
+      {"weapon_id": "kol_exit_adapter", "required_evidence": ["wallet_flow", "swap_flow"], "priority": 110},
+      {"weapon_id": "cross_chain_radar", "required_evidence": ["cross_chain_flow", "volume_profile"], "priority": 80},
+      {"weapon_id": "copycat_trap", "required_evidence": ["token_metadata", "historical_baseline"], "priority": 70}
+    ],
+    "DISTRIBUTION": [
+      {"weapon_id": "pre_dump_radar", "required_evidence": ["liquidity_snapshot", "swap_flow", "dev_wallet_flow"], "priority": 120},
+      {"weapon_id": "kol_exit_adapter", "required_evidence": ["wallet_flow", "swap_flow"], "priority": 110},
+      {"weapon_id": "autopsy_engine", "required_evidence": ["historical_baseline", "dev_wallet_flow"], "priority": 90}
+    ],
+    "REVIVAL": [
+      {"weapon_id": "autopsy_engine", "required_evidence": ["historical_baseline", "dev_wallet_flow"], "priority": 110},
+      {"weapon_id": "cross_chain_radar", "required_evidence": ["cross_chain_flow", "volume_profile"], "priority": 90},
+      {"weapon_id": "copycat_trap", "required_evidence": ["token_metadata", "historical_baseline"], "priority": 80}
+    ]
+  }
+}
