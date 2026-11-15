@@ -39,11 +39,7 @@ def _parser() -> argparse.ArgumentParser:
     discover.add_argument(
         "--once", action="store_true", help="Run one discovery cycle and exit."
     )
-
-    # --- TAMBAHAN UNTUK DASHBOARD ---
     sub.add_parser("dashboard", help="Launch the visual live radar dashboard.")
-    # --------------------------------
-
     sub.add_parser("outbox", help="Run one outbox delivery pass.")
     monitor_p = sub.add_parser(
         "monitor", help="Continuously scan a watchlist (paper only)."
@@ -162,7 +158,6 @@ def _dispatch(args, settings: Settings) -> int:
         )
         return EXIT_ERROR
 
-    # --- TAMBAHAN UNTUK DASHBOARD ---
     if args.command == "dashboard":
         try:
             from bangzen_prime.interfaces.dashboard import main as run_dashboard
@@ -175,7 +170,6 @@ def _dispatch(args, settings: Settings) -> int:
             return EXIT_ERROR
         run_dashboard()
         return EXIT_OK
-    # --------------------------------
 
     if settings.emergency_stop and args.command in {"scan", "discover", "outbox"}:
         print(
@@ -189,7 +183,6 @@ def _dispatch(args, settings: Settings) -> int:
     container = build_container(settings)
     try:
         if args.command == "migrate":
-            # build_container already applies pending migrations (idempotent); report the result.
             versions = [
                 r["version"]
                 for r in container.db.query_all(
@@ -231,8 +224,6 @@ def _dispatch(args, settings: Settings) -> int:
             except KeyboardInterrupt:
                 print("discovery stopped by operator", file=sys.stderr, flush=True)
         elif args.command == "monitor":
-            import time
-
             from bangzen_prime.application.api_budget_defaults import (
                 default_budget_registry,
             )
