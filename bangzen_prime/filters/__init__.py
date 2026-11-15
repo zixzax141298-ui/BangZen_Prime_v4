@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Filters Package
+BANGZEN - Filters Package
 
 Security and market condition filters applied before strategy evaluation.
 """

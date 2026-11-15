@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Security Hard-Filters
+BANGZEN - Security Hard-Filters
 
 Pre-trade safety checks that must ALL pass before any strategy evaluation.
 These are non-negotiable gates — a single failure kills the trade regardless
@@ -24,7 +24,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-logger = logging.getLogger("FENRIR.SecurityFilter")
+logger = logging.getLogger("BANGZEN.SecurityFilter")
 
 # RugCheck (rugcheck.xyz) — keyless risk-scoring API for Solana tokens.
 RUGCHECK_API = "https://api.rugcheck.xyz/v1"

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Post-Dump Recovery Detector (Ouroboros Pattern)
+BANGZEN - Post-Dump Recovery Detector (Ouroboros Pattern)
 
 Detects the "dumps → fake recovery → second dump" pattern that destroys
 degen positions. Inspired by OBLITERATUS's Ouroboros effect detection —

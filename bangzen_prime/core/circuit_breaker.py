@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Per-Service Circuit Breaker
+BANGZEN - Per-Service Circuit Breaker
 
 Adapted from deploybot's single-job kill switch into a full three-state
 machine: CLOSED → OPEN → HALF_OPEN → CLOSED.
@@ -90,7 +90,7 @@ class CircuitBreakerConfig:
     half_open_max_calls: int = 1
 
 
-# Per-service defaults tuned for FENRIR's traffic patterns
+# Per-service defaults tuned for BANGZEN's traffic patterns
 _OPENROUTER_CFG = CircuitBreakerConfig(
     failure_threshold=3,
     recovery_timeout_s=60.0,
@@ -356,7 +356,7 @@ class CircuitBreaker:
 
 class ServiceBreakers:
     """
-    Pre-configured circuit breakers for every external service FENRIR calls.
+    Pre-configured circuit breakers for every external service BANGZEN calls.
 
     Instantiate once at bot startup and pass through the DI chain, or
     use as a module-level singleton.
