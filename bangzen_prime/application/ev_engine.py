@@ -21,7 +21,7 @@ class EVSimulationResult:
 class EVEngine:
     """
     Mesin Eksekusi berbasis Expected Value (EV) dan Position Sizing.
-    Diadopsi dari logika inti Fenrir v2.
+    Diadopsi dari logika inti Bangzen v2.
     """
 
     def __init__(
@@ -39,7 +39,7 @@ class EVEngine:
     ) -> EVSimulationResult:
         """Menjalankan simulasi EV dan Position Sizing sebelum 'membeli'."""
 
-        # 1. Validasi EV (Menggunakan logika Fenrir v2 dari ev_model.py)
+        # 1. Validasi EV (Menggunakan logika Bangzen v2 dari ev_model.py)
         validation = validate_trade_plan(entry_price, sl_price, tp_price, cost_pct)
         if not validation.is_valid:
             logger.info(f"[EV ENGINE] Rejected: {validation.reason}")

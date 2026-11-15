@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Range Rotation (Community-Coin Rebalancing)
+bangzen Strategy: Range Rotation (Community-Coin Rebalancing)
 
 The nobrainflip rebalancing play, as a playbook tagger: buy the bottom of the
 range in a *settled* community coin and hold for the next leg, instead of
@@ -41,7 +41,7 @@ the stop.
 
 Conforms to the ``TradingStrategy`` ABC (registers in STRATEGY_REGISTRY) with
 the richer ``evaluate_token`` / ``RangeRotationSignal`` machinery gated on the
-DexScreener ``MarketData`` produced by ``fenrir.filters``. Off by default
+DexScreener ``MarketData`` produced by ``bangzen.filters``. Off by default
 (opt-in); the scout uses it read-only as a playbook tag.
 """
 
@@ -55,7 +55,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.RangeRotation")
+logger = logging.getLogger("bangzen.RangeRotation")
 
 
 @dataclass

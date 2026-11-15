@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Momentum Continuation (Trend Riding)
+bangzen Strategy: Momentum Continuation (Trend Riding)
 
 Rides an established, *accelerating* uptrend rather than sniping a launch or
 buying a dip. The thesis: a token already moving up on rising volume and
@@ -29,7 +29,7 @@ the parabolic cap exist to avoid entering exhaustion moves.
 
 Conforms to the ``TradingStrategy`` ABC (registers in STRATEGY_REGISTRY) with the
 richer ``evaluate_token`` / ``MomentumSignal`` machinery gated on the DexScreener
-``MarketData`` produced by ``fenrir.filters``. Off by default (opt-in).
+``MarketData`` produced by ``bangzen.filters``. Off by default (opt-in).
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.Momentum")
+logger = logging.getLogger("bangzen.Momentum")
 
 
 @dataclass

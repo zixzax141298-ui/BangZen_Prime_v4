@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Mean Reversion (Oversold Bounce)
+bangzen Strategy: Mean Reversion (Oversold Bounce)
 
 The conceptual inverse of the momentum strategy. Instead of buying strength, it
 fades a sharp *oversold dislocation* on the bet that price reverts toward its
@@ -30,7 +30,7 @@ when the bounce does not come.
 
 Conforms to the ``TradingStrategy`` ABC (registers in STRATEGY_REGISTRY) with the
 richer ``evaluate_token`` / ``MeanReversionSignal`` machinery gated on the
-DexScreener ``MarketData`` produced by ``fenrir.filters``. Off by default (opt-in).
+DexScreener ``MarketData`` produced by ``bangzen.filters``. Off by default (opt-in).
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.MeanReversion")
+logger = logging.getLogger("bangzen.MeanReversion")
 
 
 @dataclass

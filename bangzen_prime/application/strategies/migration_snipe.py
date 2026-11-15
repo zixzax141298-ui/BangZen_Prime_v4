@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Migration Snipe (Ultra-Early)
+bangzen Strategy: Migration Snipe (Ultra-Early)
 
 Targets tokens at the exact moment they graduate from the pump.fun bonding
 curve and launch onto Raydium. Buys within 1-2 minutes of pool opening and
@@ -22,7 +22,7 @@ Risk: EXTREME — developer bundle dumps are common on migration.
 
 Conforms to the ``TradingStrategy`` ABC (registers in STRATEGY_REGISTRY) while
 retaining the richer ``evaluate_token`` / ``MigrationSignal`` machinery, which
-gates on the DexScreener ``MarketData`` produced by ``fenrir.filters``.
+gates on the DexScreener ``MarketData`` produced by ``bangzen.filters``.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.MigrationSnipe")
+logger = logging.getLogger("bangzen.MigrationSnipe")
 
 RAYDIUM_AMM_PROGRAM = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
 PUMPFUN_MIGRATION_PROGRAM = "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg"

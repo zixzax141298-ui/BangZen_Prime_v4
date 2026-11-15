@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Narrative / Cult Tracker (Swing Trading)
+bangzen Strategy: Narrative / Cult Tracker (Swing Trading)
 
 Tracks social meta-narratives and buys secondary tokens when the
 primary leader of a narrative pumps hard. Liquidity naturally rotates
@@ -28,7 +28,7 @@ matches and leader/beta relationships.
 
 Conforms to the ``TradingStrategy`` ABC (registers in STRATEGY_REGISTRY) while
 retaining the richer ``evaluate_token`` / ``NarrativeSignal`` machinery, which
-gates on the DexScreener ``MarketData`` produced by ``fenrir.filters``.
+gates on the DexScreener ``MarketData`` produced by ``bangzen.filters``.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.NarrativeTracker")
+logger = logging.getLogger("bangzen.NarrativeTracker")
 
 # Known narrative keyword clusters
 # AI brain will extend these dynamically based on current meta

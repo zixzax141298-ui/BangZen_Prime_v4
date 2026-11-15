@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Volatility Breakout
+BANGZEN Strategy: Volatility Breakout
 
 Buys the vertical move that every other strategy refuses to chase. The thesis:
 when a token prints +40% or more in an hour on expanding, buy-driven volume,
@@ -39,7 +39,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.VolatilityBreakout")
+logger = logging.getLogger("BANGZEN.VolatilityBreakout")
 
 
 @dataclass

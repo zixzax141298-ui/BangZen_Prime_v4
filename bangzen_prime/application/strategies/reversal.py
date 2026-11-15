@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: 15-Minute Reversal (The "Second Leg")
+bangzen Strategy: 15-Minute Reversal (The "Second Leg")
 
 Targets tokens between 15 minutes and 2 hours old that have crashed
 60-80% from their initial peak but are now consolidating and showing
@@ -23,7 +23,7 @@ Risk: HIGH — support floor can collapse entirely if CTO fails.
 
 Conforms to the ``TradingStrategy`` ABC (registers in STRATEGY_REGISTRY) while
 retaining the richer ``evaluate_token`` / ``ReversalSignal`` machinery, which
-gates on the DexScreener ``MarketData`` produced by ``fenrir.filters``.
+gates on the DexScreener ``MarketData`` produced by ``bangzen.filters``.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.ReversalStrategy")
+logger = logging.getLogger("bangzen.ReversalStrategy")
 
 
 @dataclass

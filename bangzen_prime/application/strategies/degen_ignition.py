@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Degen Ignition
+BANGZEN Strategy: Degen Ignition
 
 Catches a launch in its first hour when buy pressure detonates — the moment a
 trench coin goes from "just created" to "everyone is aping". The thesis: the
@@ -39,7 +39,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.DegenIgnition")
+logger = logging.getLogger("BANGZEN.DegenIgnition")
 
 
 @dataclass

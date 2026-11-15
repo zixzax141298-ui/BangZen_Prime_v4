@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Volume Surge
+BANGZEN Strategy: Volume Surge
 
 The higher-cap volume trade. The thesis: when an established token ($2M–$25M
 market cap) prints violent volume turnover — half its market cap or more
@@ -47,7 +47,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.VolumeSurge")
+logger = logging.getLogger("BANGZEN.VolumeSurge")
 
 
 @dataclass

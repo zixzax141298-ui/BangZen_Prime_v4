@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Volume-to-Market Cap Anomaly (Day Trading)
+bangzen Strategy: Volume-to-Market Cap Anomaly (Day Trading)
 
 Finds mid-cap meme coins ($500k-$3M) where 24h volume significantly
 exceeds market cap — a signal of intense interest and high volatility
@@ -23,7 +23,7 @@ Solana network congestion can stall exits.
 
 Conforms to the ``TradingStrategy`` ABC (registers in STRATEGY_REGISTRY) while
 retaining the richer ``evaluate_token`` / ``VolumeAnomalySignal`` machinery,
-which gates on the DexScreener ``MarketData`` produced by ``fenrir.filters``.
+which gates on the DexScreener ``MarketData`` produced by ``bangzen.filters``.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.VolumeAnomaly")
+logger = logging.getLogger("bangzen.VolumeAnomaly")
 
 
 @dataclass

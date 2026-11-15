@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR Strategy: Flush Recovery (Post-Flush Second Leg)
+bangzen Strategy: Flush Recovery (Post-Flush Second Leg)
 
 The kioto $100M-runner pattern, as a playbook tagger: every big Robinhood
 runner follows the same structure — initial traction rally, euphoria fade,
@@ -44,7 +44,7 @@ flushes that are turning, not on coins still being distributed into the bid.
 
 Conforms to the ``TradingStrategy`` ABC (registers in STRATEGY_REGISTRY) with
 the richer ``evaluate_token`` / ``FlushRecoverySignal`` machinery gated on the
-DexScreener ``MarketData`` produced by ``fenrir.filters``. Off by default
+DexScreener ``MarketData`` produced by ``bangzen.filters``. Off by default
 (opt-in); the scout uses it read-only as a playbook tag.
 """
 
@@ -58,7 +58,7 @@ from typing import Any
 from bangzen_prime.config import BotConfig
 from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
-logger = logging.getLogger("FENRIR.FlushRecovery")
+logger = logging.getLogger("bangzen.FlushRecovery")
 
 
 @dataclass

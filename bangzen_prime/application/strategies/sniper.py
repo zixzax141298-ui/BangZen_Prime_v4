@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-FENRIR - Sniper Strategy
+BANGZEN - Sniper Strategy
 
-The default FENRIR strategy: detect fresh pump.fun launches and
+The default BANGZEN strategy: detect fresh pump.fun launches and
 snipe them immediately via the bonding curve.
 
 This extracts the existing bot logic into a self-contained strategy

@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 def main():
     print("\n" + "=" * 50)
-    print("🧠 BANGZEN PRIME - EV ENGINE SIMULATOR (Fenrir v2)")
+    print("🧠 BANGZEN PRIME - EV ENGINE SIMULATOR (Bangzen v2)")
     print("=" * 50)
 
     # Modal $1000, Risiko 1.5% per trade

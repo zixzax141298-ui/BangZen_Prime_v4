@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Graduation Strategy
+BANGZEN - Graduation Strategy
 
 Buy tokens that are approaching Raydium migration (the "graduation").
 When a pump.fun token raises ~85 SOL, it migrates to Raydium with
