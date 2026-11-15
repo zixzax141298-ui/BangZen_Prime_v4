@@ -10,8 +10,11 @@ unit. Entry criteria: fresh launch, meets liquidity/mcap filters,
 not yet migrated to Raydium.
 """
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import TRADING_PRESETS, BotConfig, TradingMode
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 
 class SniperStrategy(TradingStrategy):

@@ -36,8 +36,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("BANGZEN.DegenIgnition")
 
@@ -113,7 +116,9 @@ class DegenIgnitionStrategy(TradingStrategy):
     max_concurrent_positions = 5
     uses_market_data = True
 
-    def __init__(self, config: BotConfig, params: DegenIgnitionConfig | None = None) -> None:
+    def __init__(
+        self, config: BotConfig, params: DegenIgnitionConfig | None = None
+    ) -> None:
         super().__init__()
         self.config = config
         self.params = params or DegenIgnitionConfig()
@@ -176,8 +181,12 @@ class DegenIgnitionStrategy(TradingStrategy):
 
         failures = []
         if age_minutes > self.params.max_age_minutes:
-            failures.append(f"age {age_minutes:.0f}m > {self.params.max_age_minutes:.0f}m")
-        if not (self.params.min_market_cap_usd <= mcap <= self.params.max_market_cap_usd):
+            failures.append(
+                f"age {age_minutes:.0f}m > {self.params.max_age_minutes:.0f}m"
+            )
+        if not (
+            self.params.min_market_cap_usd <= mcap <= self.params.max_market_cap_usd
+        ):
             failures.append(f"mcap ${mcap:,.0f} outside degen window")
         if liq < self.params.min_liquidity_usd:
             failures.append(f"LP ${liq:,.0f} < ${self.params.min_liquidity_usd:,.0f}")
@@ -185,18 +194,26 @@ class DegenIgnitionStrategy(TradingStrategy):
             failures.append("1h buy/sell unavailable")
         elif ratio < self.params.min_buy_sell_ratio_1h:
             r = f"{ratio:.2f}" if ratio != float("inf") else "all-buys"
-            failures.append(f"1h buy/sell {r} < {self.params.min_buy_sell_ratio_1h}x (no ignition)")
+            failures.append(
+                f"1h buy/sell {r} < {self.params.min_buy_sell_ratio_1h}x (no ignition)"
+            )
         if buys_1h < self.params.min_buys_1h:
             failures.append(f"1h buys {buys_1h} < {self.params.min_buys_1h}")
         if share is None:
             failures.append("1h volume share unavailable")
         elif share < self.params.min_volume_1h_share:
-            failures.append(f"1h vol share {share:.1%} < {self.params.min_volume_1h_share:.0%}")
+            failures.append(
+                f"1h vol share {share:.1%} < {self.params.min_volume_1h_share:.0%}"
+            )
         if change_5m < self.params.min_price_change_5m_pct:
             failures.append(f"5m {change_5m:+.0f}% — dumping into the bid")
 
         if failures:
-            logger.debug("DegenIgnition reject %s...: %s", token_address[:8], " | ".join(failures))
+            logger.debug(
+                "DegenIgnition reject %s...: %s",
+                token_address[:8],
+                " | ".join(failures),
+            )
             return None
 
         # The failure guard above returns when either is None; safe to coerce now.

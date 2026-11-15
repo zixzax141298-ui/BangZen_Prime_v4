@@ -21,3 +21,4 @@ native/rust/target/
 *.egg-info/
 .env
 build/
+fenrir-v2-main/

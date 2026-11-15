@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """BANGZEN PRIME - Strategy Base Class"""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
+
 
 @dataclass
 class TradeParams:
@@ -30,6 +32,7 @@ class TradeParams:
             "ai_temperature": self.ai_temperature,
         }
 
+
 @dataclass
 class StrategyState:
     active: bool = True
@@ -44,6 +47,7 @@ class StrategyState:
     def win_rate_today(self) -> float:
         total = self.wins_today + self.losses_today
         return self.wins_today / total if total > 0 else 0.0
+
 
 class TradingStrategy(ABC):
     strategy_id: str = "bangzen_base"

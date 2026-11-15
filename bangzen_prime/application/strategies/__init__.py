@@ -1,5 +1,7 @@
 from bangzen_prime.application.strategies.base_strategy import (
-    StrategyState, TradeParams, TradingStrategy
+    StrategyState,
+    TradeParams,
+    TradingStrategy,
 )
 from bangzen_prime.application.strategies.degen_ignition import DegenIgnitionStrategy
 from bangzen_prime.application.strategies.flush_recovery import FlushRecoveryStrategy
@@ -11,9 +13,13 @@ from bangzen_prime.application.strategies.narrative import NarrativeTrackerStrat
 from bangzen_prime.application.strategies.range_rotation import RangeRotationStrategy
 from bangzen_prime.application.strategies.reversal import ReversalStrategy
 from bangzen_prime.application.strategies.sniper import (
-    ConservativeSniperStrategy, DegenSniperStrategy, SniperStrategy,
+    ConservativeSniperStrategy,
+    DegenSniperStrategy,
+    SniperStrategy,
 )
-from bangzen_prime.application.strategies.volatility_breakout import VolatilityBreakoutStrategy
+from bangzen_prime.application.strategies.volatility_breakout import (
+    VolatilityBreakoutStrategy,
+)
 from bangzen_prime.application.strategies.volume_anomaly import VolumeAnomalyStrategy
 from bangzen_prime.application.strategies.volume_surge import VolumeSurgeStrategy
 

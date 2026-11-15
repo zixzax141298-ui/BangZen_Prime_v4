@@ -36,8 +36,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("BANGZEN.VolatilityBreakout")
 
@@ -115,7 +118,9 @@ class VolatilityBreakoutStrategy(TradingStrategy):
     max_concurrent_positions = 3
     uses_market_data = True
 
-    def __init__(self, config: BotConfig, params: VolatilityBreakoutConfig | None = None) -> None:
+    def __init__(
+        self, config: BotConfig, params: VolatilityBreakoutConfig | None = None
+    ) -> None:
         super().__init__()
         self.config = config
         self.params = params or VolatilityBreakoutConfig()
@@ -183,7 +188,9 @@ class VolatilityBreakoutStrategy(TradingStrategy):
 
         failures = []
         if not (
-            self.params.min_price_change_1h_pct <= change_1h <= self.params.max_price_change_1h_pct
+            self.params.min_price_change_1h_pct
+            <= change_1h
+            <= self.params.max_price_change_1h_pct
         ):
             failures.append(
                 f"1h {change_1h:+.0f}% outside breakout window "
@@ -203,17 +210,25 @@ class VolatilityBreakoutStrategy(TradingStrategy):
         if share is None:
             failures.append("1h volume share unavailable")
         elif share < self.params.min_volume_1h_share:
-            failures.append(f"1h vol share {share:.1%} < {self.params.min_volume_1h_share:.0%}")
+            failures.append(
+                f"1h vol share {share:.1%} < {self.params.min_volume_1h_share:.0%}"
+            )
         if vol_24h < self.params.min_volume_24h_usd:
-            failures.append(f"Vol24h ${vol_24h:,.0f} < ${self.params.min_volume_24h_usd:,.0f}")
+            failures.append(
+                f"Vol24h ${vol_24h:,.0f} < ${self.params.min_volume_24h_usd:,.0f}"
+            )
         if liq < self.params.min_liquidity_usd:
             failures.append(f"LP ${liq:,.0f} < ${self.params.min_liquidity_usd:,.0f}")
         if age_minutes > self.params.max_age_minutes:
-            failures.append(f"age {age_minutes:.0f}m > {self.params.max_age_minutes:.0f}m")
+            failures.append(
+                f"age {age_minutes:.0f}m > {self.params.max_age_minutes:.0f}m"
+            )
 
         if failures:
             logger.debug(
-                "VolatilityBreakout reject %s...: %s", token_address[:8], " | ".join(failures)
+                "VolatilityBreakout reject %s...: %s",
+                token_address[:8],
+                " | ".join(failures),
             )
             return None
 

@@ -52,8 +52,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("bangzen.RangeRotation")
 
@@ -145,7 +148,9 @@ class RangeRotationStrategy(TradingStrategy):
     max_concurrent_positions = 3
     uses_market_data = True
 
-    def __init__(self, config: BotConfig, params: RangeRotationConfig | None = None) -> None:
+    def __init__(
+        self, config: BotConfig, params: RangeRotationConfig | None = None
+    ) -> None:
         super().__init__()
         self.config = config
         self.params = params or RangeRotationConfig()
@@ -257,9 +262,13 @@ class RangeRotationStrategy(TradingStrategy):
 
         # Community-coin structure: deep, alive, distributed.
         if liq < self.params.min_liquidity_usd:
-            failures.append(f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}")
+            failures.append(
+                f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}"
+            )
         if vol_1h < self.params.min_volume_1h_usd:
-            failures.append(f"Vol(1h) ${vol_1h:,.0f} < min ${self.params.min_volume_1h_usd:,.0f}")
+            failures.append(
+                f"Vol(1h) ${vol_1h:,.0f} < min ${self.params.min_volume_1h_usd:,.0f}"
+            )
         if top_holder is not None and top_holder > self.params.max_top_holder_pct:
             failures.append(
                 f"top holder {top_holder:.1f}% > {self.params.max_top_holder_pct:.0f}% "
@@ -267,7 +276,9 @@ class RangeRotationStrategy(TradingStrategy):
             )
 
         if failures:
-            logger.debug(f"Range rotation reject {token_address[:8]}...: {' | '.join(failures)}")
+            logger.debug(
+                f"Range rotation reject {token_address[:8]}...: {' | '.join(failures)}"
+            )
             return None
 
         signal = RangeRotationSignal(

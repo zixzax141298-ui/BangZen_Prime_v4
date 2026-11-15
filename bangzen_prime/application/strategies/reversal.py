@@ -33,8 +33,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("bangzen.ReversalStrategy")
 
@@ -60,9 +63,13 @@ class ReversalConfig:
     # Hard stop-loss (tight — if support breaks it collapses fast)
     stop_loss_pct: float = 20.0
     # Incremental take-profit levels
-    take_profit_levels: list[float] = field(default_factory=lambda: [25.0, 50.0, 100.0, 200.0])
+    take_profit_levels: list[float] = field(
+        default_factory=lambda: [25.0, 50.0, 100.0, 200.0]
+    )
     # Sell fraction at each TP level
-    take_profit_fractions: list[float] = field(default_factory=lambda: [0.25, 0.25, 0.25, 0.25])
+    take_profit_fractions: list[float] = field(
+        default_factory=lambda: [0.25, 0.25, 0.25, 0.25]
+    )
     # Max hold time (minutes)
     max_hold_minutes: float = 180.0
     # AI confidence threshold
@@ -231,13 +238,17 @@ class ReversalStrategy(TradingStrategy):
             )
 
         if liq < self.params.min_liquidity_usd:
-            failures.append(f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}")
+            failures.append(
+                f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}"
+            )
 
         if txns_1h < self.params.min_txns_1h:
             failures.append(f"Txns(1h) {txns_1h} < min {self.params.min_txns_1h}")
 
         if failures:
-            logger.info(f"Reversal reject {token_address[:8]}...: {' | '.join(failures)}")
+            logger.info(
+                f"Reversal reject {token_address[:8]}...: {' | '.join(failures)}"
+            )
             return None
 
         signal = ReversalSignal(
