@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Budget Tracker & Capability Gates
+BANGZEN - Budget Tracker & Capability Gates
 
 Enforces per-strategy SOL budgets and position limits.
 Acts as the last safety check before any trade execution.

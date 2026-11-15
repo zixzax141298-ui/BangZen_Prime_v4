@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-FENRIR - Solana Client
+BANGZEN - Solana Client
 
-The interface between FENRIR and Solana.
+The interface between BANGZEN and Solana.
 Every RPC call is a question. This class asks them eloquently.
 """
 
@@ -18,7 +18,7 @@ from solders.transaction import Transaction
 
 from bangzen_prime.config import BotConfig
 from bangzen_prime.core.circuit_breaker import CircuitBreaker, CircuitOpen
-from bangzen_prime.logger import FenrirLogger
+from bangzen_prime.logger import BangzenLogger
 
 # Default timeout for individual RPC calls (seconds)
 RPC_TIMEOUT_SECONDS = 15
@@ -26,14 +26,14 @@ RPC_TIMEOUT_SECONDS = 15
 
 class SolanaClient:
     """
-    The interface between FENRIR and Solana.
+    The interface between BANGZEN and Solana.
     Every RPC call is a question. This class asks them eloquently.
     """
 
     def __init__(
         self,
         config: BotConfig,
-        logger: FenrirLogger,
+        logger: BangzenLogger,
         breaker: CircuitBreaker | None = None,
     ):
         self.config = config

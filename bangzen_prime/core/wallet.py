@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Wallet Management
+BANGZEN - Wallet Management
 
 Your keys, your crypto. Handle with the reverence they deserve.
 """

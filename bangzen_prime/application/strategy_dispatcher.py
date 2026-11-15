@@ -76,7 +76,7 @@ class StrategyDispatcher:
             except TypeError:
                 strategy_instance = strategy_class()
 
-            # 2. Ubah dict ke Objek (untuk FENRIR)
+            # 2. Ubah dict ke Objek (untuk BANGZEN)
             market_data_obj = SimpleNamespace(**token_data)
 
             # 3. Eksekusi

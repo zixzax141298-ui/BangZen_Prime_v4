@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Market Condition Filters
+BANGZEN - Market Condition Filters
 
 Two-tier market scanning with different criteria per token age:
 
@@ -23,7 +23,7 @@ from typing import Any
 from bangzen_prime.discovery.models import Chain
 from bangzen_prime.discovery.providers.dexscreener import DexScreenerProvider
 
-logger = logging.getLogger("FENRIR.MarketFilter")
+logger = logging.getLogger("BANGZEN.MarketFilter")
 
 
 @dataclass
@@ -329,7 +329,7 @@ class MarketFilter:
 
     @staticmethod
     def _snapshot_to_market_data(token_address: str, snap: Any) -> MarketData:
-        """Adapt a :class:`~fenrir.discovery.models.TokenSnapshot` to ``MarketData``."""
+        """Adapt a :class:`~bangzen.discovery.models.TokenSnapshot` to ``MarketData``."""
         price_change = (
             (snap.raw.get("priceChange") or {}) if isinstance(snap.raw, dict) else {}
         )

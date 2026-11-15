@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Position Tracking
+BANGZEN - Position Tracking
 
 Position management and portfolio tracking.
 """
@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from bangzen_prime.config import BotConfig
-from bangzen_prime.logger import FenrirLogger
+from bangzen_prime.logger import BangzenLogger
 
 
 @dataclass
@@ -115,7 +115,7 @@ class PositionManager:
     Tracks all positions with the precision of a Swiss watch.
     """
 
-    def __init__(self, config: BotConfig, logger: FenrirLogger):
+    def __init__(self, config: BotConfig, logger: BangzenLogger):
         self.config = config
         self.logger = logger
         self.positions: dict[str, Position] = {}

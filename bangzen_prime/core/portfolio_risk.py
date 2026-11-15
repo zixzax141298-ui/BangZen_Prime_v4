@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-FENRIR - Portfolio-level risk
+BANGZEN - Portfolio-level risk
 
-Sits ABOVE the per-strategy budget tracker (fenrir.core.budget). Where that gates
+Sits ABOVE the per-strategy budget tracker (bangzen.core.budget). Where that gates
 each strategy in isolation, this looks across the whole book:
 
   - Aggregate exposure: total live SOL across every open position.

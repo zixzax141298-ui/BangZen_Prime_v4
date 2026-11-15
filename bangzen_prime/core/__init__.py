@@ -1,5 +1,5 @@
 """
-FENRIR Core - Wallet, client, positions, and Jupiter integration.
+BANGZEN Core - Wallet, client, positions, and Jupiter integration.
 """
 
 from .client import SolanaClient

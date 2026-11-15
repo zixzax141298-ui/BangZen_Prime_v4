@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Multi-agent decision pipeline (Phase 3, strangler)
+BANGZEN - Multi-agent decision pipeline (Phase 3, strangler)
 
 Decomposes the single ClaudeBrain decision loop into three coordinating async
 agents that communicate over the existing EventBus:
@@ -95,7 +95,7 @@ class PipelineAgent(EventListener):
         raise NotImplementedError
 
     def _log(self, level: str, msg: str) -> None:
-        # Logging must never crash a worker. FenrirLogger.error has a two-arg
+        # Logging must never crash a worker. BangzenLogger.error has a two-arg
         # (context, exception) signature, unlike stdlib Logger.error(msg); calling it
         # with a single string raises TypeError, so fall back to warning/info.
         if self._logger is None:

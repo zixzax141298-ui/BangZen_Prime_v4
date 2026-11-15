@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FENRIR - Jupiter Swap Engine
+BANGZEN - Jupiter Swap Engine
 
 Jupiter aggregator integration.
 Finding the best price is an art form.
@@ -12,7 +12,7 @@ import aiohttp
 
 from bangzen_prime.config import BotConfig
 from bangzen_prime.core.circuit_breaker import CircuitBreaker, CircuitOpen
-from bangzen_prime.logger import FenrirLogger
+from bangzen_prime.logger import BangzenLogger
 
 
 class JupiterSwapEngine:
@@ -30,7 +30,7 @@ class JupiterSwapEngine:
     def __init__(
         self,
         config: BotConfig,
-        logger: FenrirLogger,
+        logger: BangzenLogger,
         breaker: CircuitBreaker | None = None,
     ):
         self.config = config
