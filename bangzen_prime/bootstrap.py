@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from decimal import Decimal
 
 from bangzen_prime.application.ai_commander import AICommander
 from bangzen_prime.application.auto_blacklist_manager import AutoBlacklistManager
@@ -14,6 +15,7 @@ from bangzen_prime.application.autopsy_engine import AutopsyEngine
 from bangzen_prime.application.black_ops_engine import BlackOpsEngine
 from bangzen_prime.application.discovery import ContinuousDiscoveryUseCase
 from bangzen_prime.application.event_bus import EventBus
+from bangzen_prime.application.fenrir_signal import FenrirSignalUseCase
 from bangzen_prime.application.mode_controller import ModeController
 from bangzen_prime.application.notifications import (
     SIGNAL_EVENT,
@@ -23,15 +25,20 @@ from bangzen_prime.application.notifications import (
     make_notification_handler,
 )
 from bangzen_prime.application.outbox_worker import OutboxWorker
+
+# --- Paper Trading & Fenrir Imports ---
+from bangzen_prime.application.paper_trading import PaperPortfolio, PaperTradingUseCase
 from bangzen_prime.application.phase_policy import DEFAULT_POLICY, load_policy
 from bangzen_prime.application.realistic_pumpfun import RealisticPumpfunEngine
+from bangzen_prime.application.risk_engine import (
+    ExposureReservations,
+    RiskEngine,
+    RiskLimits,
+)
 from bangzen_prime.application.second_life_strategy import SecondLifeStrategy
-
-# ============================================================
-# IMPORTS 28 SENJATA (v3)
-# ============================================================
 from bangzen_prime.application.setup_engine import SetupEngine
 from bangzen_prime.application.smart_money_engine import SmartMoneyEngine
+from bangzen_prime.application.strategy_dispatcher import StrategyDispatcher
 from bangzen_prime.application.token_program_evidence import TokenProgramEvidenceUseCase
 from bangzen_prime.application.use_cases import (
     AuditTokenUseCase,
@@ -45,6 +52,7 @@ from bangzen_prime.application.wallet_access import (
 from bangzen_prime.infrastructure.adapters.chain.helius_token_2022_extensions import (
     HeliusToken2022ExtensionReader,
 )
+from bangzen_prime.infrastructure.adapters.execution.simulated import SimulatedExecution
 from bangzen_prime.infrastructure.adapters.market_data.cross_chain_radar_adapter import (
     CrossChainRadarAdapter,
 )
@@ -147,6 +155,8 @@ class Container:
     lifecycle_store: LifecycleStore
     discovery: ContinuousDiscoveryUseCase
     token_program_evidence: TokenProgramEvidenceUseCase
+    paper_trading: PaperTradingUseCase | None = None
+    fenrir_signal: FenrirSignalUseCase | None = None
     live_executor: object | None = None
 
 
@@ -205,6 +215,7 @@ def build_intel_stack(
         if settings.solana_tracker_api_key
         else None
     )
+
     if settings.jupiter_api_key:
         jupiter = JupiterQuoteAdapter(
             api_key=settings.jupiter_api_key,
@@ -215,12 +226,13 @@ def build_intel_stack(
             slippage_bps=settings.jupiter_slippage_bps,
         )
     else:
-        # Fail-closed stand-in so HoneypotAdapter can always call check_dynamic_tax.
+
         class _NullJupiter:
             async def check_dynamic_tax(self, mint: str) -> bool:
                 raise NotImplementedError("Jupiter API key not configured")
 
         jupiter = _NullJupiter()
+
     jito = JitoClient(
         transport=transport, caller=caller("jito", 300), timeout=t, clock=clock.now
     )
@@ -248,6 +260,7 @@ def build_intel_stack(
         if settings.lunarcrush_api_key
         else None
     )
+
     brain = None
     if settings.ai_enabled:
         key = {
@@ -264,6 +277,7 @@ def build_intel_stack(
             timeout=t,
         )
         brain = AIBrain(provider, threshold=settings.ai_confidence_threshold)
+
     return IntelStack(birdeye, tracker, jupiter, jito, helius, brain, lunarcrush)
 
 
@@ -278,7 +292,6 @@ def build_container(
     token_2022_reader: object | None = None,
 ) -> Container:
     clock = clock or Clock()
-    # Intel adapters use request-object transports; honour an injected transport for them too.
     intel_transport = transport or urllib_request_transport
     transport = transport or urllib_transport
     db = Database(db_path or settings.db_path)
@@ -328,6 +341,7 @@ def build_container(
         mode_controller=mode_controller,
         emergency_stop=settings.emergency_stop,
     )
+
     if notifier is not None:
         sink = ModeGatedNotifier(notifier, mode_controller)
     elif settings.telegram_bot_token and settings.telegram_allowed_chat_ids:
@@ -340,6 +354,7 @@ def build_container(
         sink = ModeGatedNotifier(telegram, mode_controller)
     else:
         sink = LogNotifier(logging.getLogger("bangzen_prime.signals"))
+
     bus.subscribe(SIGNAL_EVENT, SUBSCRIBER_NAME, make_notification_handler(sink))
     worker = OutboxWorker(
         db=db, bus=bus, clock=clock.now, base_backoff=timedelta(seconds=5)
@@ -349,9 +364,9 @@ def build_container(
     intel_adapter = None
     if token_2022_reader is None and intel.helius is not None:
         token_2022_reader = HeliusToken2022ExtensionReader(
-            account_info=intel.helius.account_info,
-            clock=clock.now,
+            account_info=intel.helius.account_info, clock=clock.now
         )
+
     token_program_evidence = TokenProgramEvidenceUseCase(token_2022_reader)
     helius_rpc_url = (
         f"https://mainnet.helius-rpc.com/?api-key={settings.helius_api_key}"
@@ -390,6 +405,43 @@ def build_container(
     )
 
     # ============================================================
+    # RAKITAN PAPER TRADING & FENRIR SIGNAL
+    # ============================================================
+    risk_limits = RiskLimits(
+        max_risk_per_trade_pct=Decimal("1.0"),
+        max_open_positions=5,
+        max_exposure_quote=Decimal(500),
+        max_drawdown_pct=Decimal(20),
+        min_liquidity_usd=Decimal(500),
+        max_spread_pct=Decimal(5),
+        max_slippage_pct=Decimal(5),
+        fee_rate=Decimal("0.001"),
+        emergency_stop=settings.emergency_stop,
+    )
+    execution = SimulatedExecution(
+        db=db,
+        fee_rate=Decimal("0.001"),
+        slippage_rate=Decimal("0.005"),
+        clock=clock.now,
+        paper=True,
+        dry_run=True,
+    )
+    paper_trading = PaperTradingUseCase(
+        db=db,
+        uow=uow,
+        engine=RiskEngine(risk_limits),
+        execution=execution,
+        portfolio=PaperPortfolio(db, Decimal(1000)),
+        reservations=ExposureReservations(Decimal(500)),
+        clock=clock.now,
+        expected_slippage_pct=Decimal("0.5"),
+    )
+
+    fenrir_signal = FenrirSignalUseCase(
+        uow=uow, dispatcher=StrategyDispatcher(), clock=clock.now
+    )
+
+    # ============================================================
     # RAKITAN 28 SENJATA BARU (v3)
     # ============================================================
     setup_engine = SetupEngine()
@@ -398,7 +450,6 @@ def build_container(
     second_life = SecondLifeStrategy()
     smart_money = SmartMoneyEngine()
     blacklist = AutoBlacklistManager()
-
     autopsy = AutopsyEngine(db_connection=db._conn)
 
     dev_predictor = DevPredictorAdapter(
@@ -429,9 +480,8 @@ def build_container(
         sniper_ban=sniper_ban,
     )
 
-    ai_commander = None
-    if intel.ai_brain:
-        ai_commander = AICommander(
+    ai_commander = (
+        AICommander(
             brain=intel.ai_brain,
             sybil=sybil_adapter,
             honeypot=honeypot_adapter,
@@ -440,8 +490,9 @@ def build_container(
             lp_sniper=lp_sniper,
             smart_money=smart_money,
         )
-
-    live_executor = None
+        if intel.ai_brain
+        else None
+    )
 
     return Container(
         settings=settings,
@@ -461,5 +512,7 @@ def build_container(
         lifecycle_store=lifecycle_store,
         discovery=discovery,
         token_program_evidence=token_program_evidence,
-        live_executor=live_executor,
+        paper_trading=paper_trading,
+        fenrir_signal=fenrir_signal,
+        live_executor=None,
     )

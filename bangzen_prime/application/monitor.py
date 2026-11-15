@@ -9,11 +9,14 @@ the adapters. One scan can call several providers, so the limit is conservative 
 
 from __future__ import annotations
 
+import asyncio
+import dataclasses
 import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from bangzen_prime.application.strategy_dispatcher import StrategyDispatcher
 from bangzen_prime.domain.tokens import validate_mint
 from bangzen_prime.errors import ConfigurationError
 from bangzen_prime.infrastructure.api_budget import BudgetRegistry
@@ -66,6 +69,7 @@ class Monitor:
     budget: BudgetRegistry
     watchlist: Sequence[str]
     chain: str = "solana"
+    dispatcher: StrategyDispatcher | None = None  # TAMBAHAN: Panglima Perang
     _last_phase: dict[str, str] = field(default_factory=dict, repr=False)
     _cycle: int = 0
 
@@ -73,6 +77,9 @@ class Monitor:
         self.watchlist = tuple(validate_mint(m) for m in self.watchlist)
         if not self.watchlist:
             raise ConfigurationError("monitor needs at least one mint")
+        # Jika tidak ada dispatcher yang dikirim, buat baru
+        if self.dispatcher is None:
+            self.dispatcher = StrategyDispatcher()
 
     def _can_scan(self) -> bool:
         return all(self.budget.remaining(p) >= 1 for p in SCAN_PROVIDERS)
@@ -95,8 +102,10 @@ class Monitor:
             self._spend()
             result = self.scan.execute(self.chain, [mint])[0]
             scanned += 1
+
             if result.status == "ACCEPTED":
                 accepted += 1
+
             previous = self._last_phase.get(mint)
             if previous is not None and previous != result.phase:
                 transitions.append(Transition(mint, previous, result.phase))
@@ -104,6 +113,35 @@ class Monitor:
                     "phase transition %s: %s -> %s", mint, previous, result.phase
                 )
             self._last_phase[mint] = result.phase
+
+            # ==========================================
+            # TAMBAHAN: SUNTIKKAN KE 15 STRATEGI (ROUTER)
+            # ==========================================
+            if self.dispatcher:
+                try:
+                    # Ubah objek 'result' menjadi dictionary
+                    if dataclasses.is_dataclass(result):
+                        token_data = dataclasses.asdict(result)
+                    elif hasattr(result, "__dict__"):
+                        token_data = result.__dict__.copy()
+                    else:
+                        token_data = {}
+
+                    token_data["mint"] = mint  # Pastikan mint address masuk
+
+                    # Karena dispatcher menggunakan async, kita jalankan via asyncio.run
+                    decision = asyncio.run(
+                        self.dispatcher.route_and_evaluate(token_data)
+                    )
+
+                    if decision.get("status") == "ACCEPTED":
+                        logger.info(
+                            f"🔥 STRATEGI MENYALA! {mint} dieksekusi oleh {decision.get('strategy')}"
+                        )
+                        # (Nanti: Panggil eksekusi Paper Trade di sini)
+                except Exception as e:
+                    logger.error(f"Gagal menjalankan Router untuk {mint}: {e}")
+
         self.worker.run_once()
         return CycleReport(self._cycle, scanned, skipped, accepted, tuple(transitions))
 

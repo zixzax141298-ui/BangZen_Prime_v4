@@ -1,25 +1,34 @@
-"""DexScreener adapter. Pair observations include optional pairCreatedAt lifecycle evidence."""
+"""DexScreener adapter. Provides rich token snapshots for strategies."""
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 from urllib.parse import quote
 
-from bangzen_prime.domain.tokens import PairSnapshot, validate_chain, validate_mint
-from bangzen_prime.errors import DomainError
-from bangzen_prime.infrastructure.adapters.market_data.parsing import (
-    MalformedData,
-    require_str,
-    to_decimal,
-)
+from bangzen_prime.domain.tokens import validate_chain, validate_mint
 from bangzen_prime.infrastructure.http import Transport, get_json
 from bangzen_prime.infrastructure.resilience.policies import ResilientCaller
 
 logger = logging.getLogger("bangzen_prime.dexscreener")
 SERVICE = "dexscreener"
+
+
+def _f(value: Any) -> float:
+    try:
+        return float(value) if value is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _i(value: Any) -> int:
+    try:
+        return int(value) if value is not None else 0
+    except (TypeError, ValueError):
+        return 0
 
 
 class DexScreenerAdapter:
@@ -38,83 +47,75 @@ class DexScreenerAdapter:
         self._timeout = timeout
         self._clock = clock
 
-    def fetch_pairs(self, chain: str, mint: str) -> list[PairSnapshot]:
+    def fetch_rich_snapshot(self, chain: str, mint: str) -> Any | None:
+        """Mengambil data pasar lengkap (volume, txns, umur) untuk strategi."""
         validate_chain(chain)
         validate_mint(mint)
-        url = f"{self._base}/token-pairs/v1/{quote(chain, safe='')}/{quote(mint, safe='')}"
-        data = self._caller.call(
-            lambda: get_json(
-                service=SERVICE,
-                url=url,
-                timeout=self._timeout,
-                transport=self._transport,
+        url = f"{self._base}/tokens/{quote(mint, safe='')}"
+
+        try:
+            data = self._caller.call(
+                lambda: get_json(
+                    service=SERVICE,
+                    url=url,
+                    timeout=self._timeout,
+                    transport=self._transport,
+                )
             )
-        )
-        if not isinstance(data, list):
-            raise MalformedData(SERVICE, "expected a list of pairs")
+        except Exception as e:
+            logger.warning(f"DexScreener fetch failed for {mint[:8]}: {e}")
+            return None
+
+        pairs = data.get("pairs") if isinstance(data, dict) else None
+        if not pairs:
+            return None
+
+        # Pilih pair dengan likuiditas tertinggi
+        best = max(pairs, key=lambda p: _f((p.get("liquidity") or {}).get("usd")))
+        return self._parse_rich_pair(mint, best)
+
+    def _parse_rich_pair(self, mint: str, pair: dict[str, Any]) -> Any:
         now = self._clock()
-        snapshots: list[PairSnapshot] = []
-        skipped = 0
-        for item in data:
+        created_ms = pair.get("pairCreatedAt")
+        created_at = None
+        age_minutes = 0.0
+
+        if created_ms:
             try:
-                snapshots.append(self._parse_pair(item, chain, mint, now))
-            except (MalformedData, DomainError):
-                skipped += 1
-        if skipped:
-            logger.warning(
-                "dexscreener skipped %d malformed or foreign pair entries", skipped
-            )
-        return snapshots
+                created_at = datetime.fromtimestamp(created_ms / 1000, tz=UTC)
+                age_minutes = (now - created_at).total_seconds() / 60.0
+            except (OverflowError, OSError, ValueError):
+                pass
 
-    @staticmethod
-    def _pair_created_at(item: dict[str, Any]) -> datetime | None:
-        raw = item.get("pairCreatedAt")
-        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
-            return None
-        try:
-            timestamp = float(raw)
-            if timestamp <= 0:
-                return None
-            if timestamp > 100_000_000_000:
-                timestamp /= 1000
-            return datetime.fromtimestamp(timestamp, tz=UTC)
-        except (OverflowError, OSError, ValueError):
-            return None
+        volume = pair.get("volume") or {}
+        txns = pair.get("txns") or {}
+        txns_5m = txns.get("m5") or {}
+        txns_1h = txns.get("h1") or {}
+        price_change = pair.get("priceChange") or {}
+        liquidity = pair.get("liquidity") or {}
+        info = pair.get("info") or {}
 
-    @staticmethod
-    def _parse_pair(item: Any, chain: str, mint: str, now: datetime) -> PairSnapshot:
-        if not isinstance(item, dict):
-            raise MalformedData(SERVICE, "pair entry is not an object")
-        if item.get("chainId") != chain:
-            raise MalformedData(SERVICE, "pair belongs to another chain")
-        base = item.get("baseToken")
-        if not isinstance(base, dict) or base.get("address") != mint:
-            raise MalformedData(SERVICE, "base token does not match requested mint")
-        liquidity = item.get("liquidity") or {}
-        volume = item.get("volume") or {}
-        if not isinstance(liquidity, dict) or not isinstance(volume, dict):
-            raise MalformedData(SERVICE, "liquidity or volume is not an object")
-        try:
-            return PairSnapshot.create(
-                chain=chain,
-                pair_address=require_str(
-                    item.get("pairAddress"), service=SERVICE, field="pairAddress"
-                ),
-                dex_id=require_str(item.get("dexId"), service=SERVICE, field="dexId"),
-                base_mint=mint,
-                base_symbol=str(base.get("symbol") or "UNKNOWN")[:32],
-                price_usd=to_decimal(
-                    item.get("priceUsd"), service=SERVICE, field="priceUsd"
-                ),
-                liquidity_usd=to_decimal(
-                    liquidity.get("usd", 0), service=SERVICE, field="liquidity.usd"
-                ),
-                volume_24h_usd=to_decimal(
-                    volume.get("h24", 0), service=SERVICE, field="volume.h24"
-                ),
-                observed_at=now,
-                pair_created_at=DexScreenerAdapter._pair_created_at(item),
-                source="DexScreener",
-            )
-        except DomainError as exc:
-            raise MalformedData(SERVICE, str(exc)) from None
+        # Menggunakan SimpleNamespace sebagai "TokenSnapshot" agar tidak perlu ubah domain
+        return SimpleNamespace(
+            chain="solana",
+            token_address=mint,
+            symbol=(pair.get("baseToken") or {}).get("symbol", "???"),
+            name=(pair.get("baseToken") or {}).get("name", "Unknown"),
+            pair_address=pair.get("pairAddress"),
+            dex_id=pair.get("dexId"),
+            price_usd=_f(pair.get("priceUsd")),
+            market_cap_usd=_f(pair.get("marketCap")),
+            liquidity_usd=_f(liquidity.get("usd")),
+            volume_5m_usd=_f(volume.get("m5")),
+            volume_1h_usd=_f(volume.get("h1")),
+            volume_24h_usd=_f(volume.get("h24")),
+            txns_5m_buys=_i(txns_5m.get("buys")),
+            txns_5m_sells=_i(txns_5m.get("sells")),
+            txns_1h_buys=_i(txns_1h.get("buys")),
+            txns_1h_sells=_i(txns_1h.get("sells")),
+            price_change_5m_pct=_f(price_change.get("m5")),
+            price_change_1h_pct=_f(price_change.get("h1")),
+            price_change_24h_pct=_f(price_change.get("h24")),
+            created_at=created_at,
+            age_minutes=age_minutes,
+        )

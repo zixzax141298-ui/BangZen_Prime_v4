@@ -1,0 +1,111 @@
+"""
+FENRIR Trading Strategies — pluggable, self-contained strategy units.
+
+Each strategy defines its own entry criteria, AI context, trade parameters,
+budget limits, and position constraints. Strategies can be activated,
+paused, and run concurrently.
+
+The signal-oriented strategies (migration_snipe, reversal, volume_anomaly,
+narrative_tracker) conform to the same ``TradingStrategy`` ABC but also expose
+a richer ``evaluate_token``/``build_ai_context`` pair that gates on the
+DexScreener ``MarketData`` from ``fenrir.filters``. They are registered here
+(discoverable) but are *off by default* — nothing activates them until the bot
+config explicitly enables them.
+"""
+
+from fenrir.strategies.base import StrategyState, TradeParams, TradingStrategy
+from fenrir.strategies.degen_ignition import DegenIgnitionStrategy
+from fenrir.strategies.flush_recovery import FlushRecoveryStrategy
+from fenrir.strategies.graduation import GraduationStrategy
+from fenrir.strategies.mean_reversion import MeanReversionStrategy
+from fenrir.strategies.migration_snipe import MigrationSniperStrategy
+from fenrir.strategies.momentum import MomentumStrategy
+from fenrir.strategies.narrative import NarrativeTrackerStrategy
+from fenrir.strategies.range_rotation import RangeRotationStrategy
+from fenrir.strategies.reversal import ReversalStrategy
+from fenrir.strategies.sniper import (
+    ConservativeSniperStrategy,
+    DegenSniperStrategy,
+    SniperStrategy,
+)
+from fenrir.strategies.volatility_breakout import VolatilityBreakoutStrategy
+from fenrir.strategies.volume_anomaly import VolumeAnomalyStrategy
+from fenrir.strategies.volume_surge import VolumeSurgeStrategy
+
+# Strategy registry: strategy_id -> class
+STRATEGY_REGISTRY: dict[str, type[TradingStrategy]] = {
+    "sniper": SniperStrategy,
+    "sniper_conservative": ConservativeSniperStrategy,
+    "sniper_degen": DegenSniperStrategy,
+    "graduation": GraduationStrategy,
+    "migration_snipe": MigrationSniperStrategy,
+    "momentum": MomentumStrategy,
+    "mean_reversion": MeanReversionStrategy,
+    "reversal": ReversalStrategy,
+    "volume_anomaly": VolumeAnomalyStrategy,
+    "narrative_tracker": NarrativeTrackerStrategy,
+    "degen_ignition": DegenIgnitionStrategy,
+    "volatility_breakout": VolatilityBreakoutStrategy,
+    "volume_surge": VolumeSurgeStrategy,
+    "range_rotation": RangeRotationStrategy,
+    "flush_recovery": FlushRecoveryStrategy,
+}
+
+# Strategies enabled unless the operator opts in. The signal-oriented
+# strategies default OFF pending pipeline wiring; the existing sniper/
+# graduation strategies remain the default-on set.
+DEFAULT_DISABLED_STRATEGIES: frozenset[str] = frozenset(
+    {
+        "migration_snipe",
+        "momentum",
+        "mean_reversion",
+        "reversal",
+        "volume_anomaly",
+        "narrative_tracker",
+        "degen_ignition",
+        "volatility_breakout",
+        "volume_surge",
+        "range_rotation",
+        "flush_recovery",
+    }
+)
+
+
+def get_strategy_class(strategy_id: str) -> type[TradingStrategy] | None:
+    """Look up a strategy class by ID."""
+    return STRATEGY_REGISTRY.get(strategy_id)
+
+
+def list_strategies() -> list[str]:
+    """List all available strategy IDs."""
+    return list(STRATEGY_REGISTRY.keys())
+
+
+def is_enabled_by_default(strategy_id: str) -> bool:
+    """Whether a strategy runs without an explicit operator opt-in."""
+    return (
+        strategy_id in STRATEGY_REGISTRY
+        and strategy_id not in DEFAULT_DISABLED_STRATEGIES
+    )
+
+
+__all__ = [
+    "DEFAULT_DISABLED_STRATEGIES",
+    "STRATEGY_REGISTRY",
+    "ConservativeSniperStrategy",
+    "DegenSniperStrategy",
+    "GraduationStrategy",
+    "MeanReversionStrategy",
+    "MigrationSniperStrategy",
+    "MomentumStrategy",
+    "NarrativeTrackerStrategy",
+    "ReversalStrategy",
+    "SniperStrategy",
+    "StrategyState",
+    "TradeParams",
+    "TradingStrategy",
+    "VolumeAnomalyStrategy",
+    "get_strategy_class",
+    "is_enabled_by_default",
+    "list_strategies",
+]
