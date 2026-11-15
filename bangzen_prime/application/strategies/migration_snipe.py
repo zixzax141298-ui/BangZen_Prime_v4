@@ -32,8 +32,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("bangzen.MigrationSnipe")
 
@@ -194,7 +197,9 @@ class MigrationSniperStrategy(TradingStrategy):
             return None
 
         if market_data is None:
-            logger.debug(f"No market data for {token_data.get('token_address', '?')[:8]}...")
+            logger.debug(
+                f"No market data for {token_data.get('token_address', '?')[:8]}..."
+            )
             return None
 
         age = getattr(market_data, "age_minutes", float("inf"))
@@ -233,7 +238,9 @@ class MigrationSniperStrategy(TradingStrategy):
 
         # Liquidity checks
         if liq < self.params.min_liquidity_usd:
-            failures.append(f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}")
+            failures.append(
+                f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}"
+            )
         if liq > self.params.max_liquidity_usd:
             failures.append(
                 f"LP ${liq:,.0f} > max ${self.params.max_liquidity_usd:,.0f} (possible bundle)"
@@ -241,20 +248,28 @@ class MigrationSniperStrategy(TradingStrategy):
 
         # Market cap checks
         if mcap < self.params.min_market_cap_usd:
-            failures.append(f"MCap ${mcap:,.0f} < min ${self.params.min_market_cap_usd:,.0f}")
+            failures.append(
+                f"MCap ${mcap:,.0f} < min ${self.params.min_market_cap_usd:,.0f}"
+            )
         if mcap > self.params.max_market_cap_usd:
-            failures.append(f"MCap ${mcap:,.0f} > max ${self.params.max_market_cap_usd:,.0f}")
+            failures.append(
+                f"MCap ${mcap:,.0f} > max ${self.params.max_market_cap_usd:,.0f}"
+            )
 
         # Volume momentum
         if vol_5m < self.params.min_volume_5m_usd:
-            failures.append(f"Vol(5m) ${vol_5m:,.0f} < min ${self.params.min_volume_5m_usd:,.0f}")
+            failures.append(
+                f"Vol(5m) ${vol_5m:,.0f} < min ${self.params.min_volume_5m_usd:,.0f}"
+            )
 
         # Transaction count
         if txns_5m < self.params.min_txns_5m:
             failures.append(f"Txns(5m) {txns_5m} < min {self.params.min_txns_5m}")
 
         if failures:
-            logger.info(f"Migration reject {token_address[:8]}...: {' | '.join(failures)}")
+            logger.info(
+                f"Migration reject {token_address[:8]}...: {' | '.join(failures)}"
+            )
             return None
 
         signal = MigrationSignal(
@@ -325,7 +340,9 @@ class MigrationSniperStrategy(TradingStrategy):
                     f"  Top-10 holders: {security_result.details['top10_holder_pct']:.1f}% of supply"
                 )
             if security_result.details.get("lp_burned_pct") is not None:
-                lines.append(f"  LP burned: {security_result.details['lp_burned_pct']:.1f}%")
+                lines.append(
+                    f"  LP burned: {security_result.details['lp_burned_pct']:.1f}%"
+                )
 
         lines.extend(
             [

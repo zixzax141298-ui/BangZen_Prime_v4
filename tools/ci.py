@@ -78,13 +78,26 @@ def rust_checks() -> list[Check]:
     return [
         Check(
             name="Cargo fmt",
-            command=("cargo", "fmt", "--manifest-path", "native/rust/Cargo.toml", "--", "--check"),
+            command=(
+                "cargo",
+                "fmt",
+                "--manifest-path",
+                "native/rust/Cargo.toml",
+                "--",
+                "--check",
+            ),
             executable="cargo",
             profiles=("vps", "github"),
         ),
         Check(
             name="Cargo test",
-            command=("cargo", "test", "--locked", "--manifest-path", "native/rust/Cargo.toml"),
+            command=(
+                "cargo",
+                "test",
+                "--locked",
+                "--manifest-path",
+                "native/rust/Cargo.toml",
+            ),
             executable="cargo",
             required_path="native/rust/Cargo.lock",
             profiles=("vps", "github"),
@@ -128,21 +141,32 @@ def run_check(check: Check, timeout: int, profile: str) -> dict[str, Any]:
     if check.required_path:
         required_path = ROOT / check.required_path
         if not required_path.exists():
-            record.update(status="BLOCKED", detail=f"Required path missing: {check.required_path}")
+            record.update(
+                status="BLOCKED", detail=f"Required path missing: {check.required_path}"
+            )
             return record
 
     if check.executable and shutil.which(check.executable) is None:
-        record.update(status="BLOCKED" if check.required else "NOT RUN", detail=f"Executable unavailable: {check.executable}")
+        record.update(
+            status="BLOCKED" if check.required else "NOT RUN",
+            detail=f"Executable unavailable: {check.executable}",
+        )
         return record
 
     print(f"\n=== {check.name} ===", flush=True)
     print("$ " + " ".join(check.command), flush=True)
 
     try:
-        completed = subprocess.run(check.command, cwd=ROOT, check=False, timeout=timeout, text=True)
+        completed = subprocess.run(
+            check.command, cwd=ROOT, check=False, timeout=timeout, text=True
+        )
         record["exit_code"] = completed.returncode
         record["status"] = "PASS" if completed.returncode == 0 else "FAIL"
-        record["detail"] = "Command completed" if completed.returncode == 0 else f"Exit code {completed.returncode}"
+        record["detail"] = (
+            "Command completed"
+            if completed.returncode == 0
+            else f"Exit code {completed.returncode}"
+        )
     except FileNotFoundError:
         record.update(status="BLOCKED", detail="Executable could not be started")
     except subprocess.TimeoutExpired:
@@ -155,8 +179,14 @@ def run_check(check: Check, timeout: int, profile: str) -> dict[str, Any]:
     return record
 
 
-def evaluate_gate(profile: str, checks: list[Check], records: list[dict[str, Any]]) -> tuple[str, str, bool]:
-    applicable = [(check, record) for check, record in zip(checks, records, strict=True) if profile in check.profiles and check.required]
+def evaluate_gate(
+    profile: str, checks: list[Check], records: list[dict[str, Any]]
+) -> tuple[str, str, bool]:
+    applicable = [
+        (check, record)
+        for check, record in zip(checks, records, strict=True)
+        if profile in check.profiles and check.required
+    ]
     if not applicable:
         return "NOT GREEN", "NO REQUIRED CHECKS", False
 
@@ -173,9 +203,18 @@ def evaluate_gate(profile: str, checks: list[Check], records: list[dict[str, Any
     return "NOT GREEN", "FULL CI FAIL OR INCOMPLETE", False
 
 
-def build_report(profile: str, requested_profile: str, records: list[dict[str, Any]], gate: str, full_ci_status: str) -> dict[str, Any]:
+def build_report(
+    profile: str,
+    requested_profile: str,
+    records: list[dict[str, Any]],
+    gate: str,
+    full_ci_status: str,
+) -> dict[str, Any]:
     statuses = ("PASS", "FAIL", "BLOCKED", "NOT RUN")
-    counts = {status: sum(record["status"] == status for record in records) for status in statuses}
+    counts = {
+        status: sum(record["status"] == status for record in records)
+        for status in statuses
+    }
     return {
         "schema_version": "1.1",
         "project": "BANGZEN PRIME",
@@ -204,7 +243,15 @@ def write_report(report_path: str, report: dict[str, Any]) -> Path | None:
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n", dir=target.parent, prefix=f".{target.name}.", suffix=".tmp", delete=False) as temporary_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            dir=target.parent,
+            prefix=f".{target.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
             temporary_path = Path(temporary_file.name)
             json.dump(report, temporary_file, indent=2)
             temporary_file.write("\n")
@@ -219,9 +266,15 @@ def write_report(report_path: str, report: dict[str, Any]) -> Path | None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="BANGZEN PRIME portable CI gate")
-    parser.add_argument("--profile", choices=("auto", "termux", "vps", "github", "full"), default="auto")
+    parser.add_argument(
+        "--profile", choices=("auto", "termux", "vps", "github", "full"), default="auto"
+    )
     parser.add_argument("--timeout", type=int, default=900)
-    parser.add_argument("--report", default="reports/ci-report.json", help="JSON report path; empty disables report")
+    parser.add_argument(
+        "--report",
+        default="reports/ci-report.json",
+        help="JSON report path; empty disables report",
+    )
     args = parser.parse_args(argv)
 
     if args.timeout < 1:
@@ -233,7 +286,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         parser.error(str(exc))
 
-    print(f"BANGZEN PRIME CI | profile={profile} | Python={sys.version.split()[0]} | {platform.platform()}", flush=True)
+    print(
+        f"BANGZEN PRIME CI | profile={profile} | Python={sys.version.split()[0]} | {platform.platform()}",
+        flush=True,
+    )
     records = [run_check(check, args.timeout, profile) for check in checks]
     gate, full_ci_status, successful = evaluate_gate(profile, checks, records)
     report = build_report(profile, args.profile, records, gate, full_ci_status)

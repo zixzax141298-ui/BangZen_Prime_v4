@@ -1,0 +1,438 @@
+#!/usr/bin/env python3
+"""
+FENRIR Trading Bot - Test Suite
+
+Run with: pytest tests/test_core.py -v
+Or: python tests/test_core.py
+"""
+
+from datetime import datetime
+
+import pytest
+
+from fenrir.config import BotConfig, TradingMode
+from fenrir.core.positions import Position, PositionManager
+from fenrir.core.wallet import WalletManager
+from fenrir.logger import FenrirLogger
+
+
+class TestBotConfig:
+    """Test configuration validation."""
+
+    def test_default_config_valid(self):
+        """Default config should be valid in simulation mode."""
+        # AI is enabled by default and requires a key; supply a dummy so the
+        # check is deterministic regardless of the ambient environment / .env
+        # (CI has no OPENROUTER_API_KEY).
+        config = BotConfig(ai_api_key="test-key")
+        errors = config.validate()
+        assert len(errors) == 0, f"Validation errors: {errors}"
+
+    def test_missing_private_key_live_trading(self, monkeypatch):
+        """Live trading requires private key."""
+        # Isolate from the developer's .env, which may define WALLET_PRIVATE_KEY
+        # (BotConfig.__post_init__ would otherwise backfill it and mask the error).
+        import fenrir.config as cfg
+
+        monkeypatch.setattr(cfg, "_ensure_dotenv", lambda: None)
+        monkeypatch.delenv("WALLET_PRIVATE_KEY", raising=False)
+        config = BotConfig(mode=TradingMode.CONSERVATIVE, private_key="")
+        errors = config.validate()
+        assert any("Private key" in err for err in errors)
+
+    def test_invalid_stop_loss(self):
+        """Stop loss >= 100% should fail."""
+        config = BotConfig(stop_loss_pct=100.0)
+        errors = config.validate()
+        assert any("Stop loss" in err for err in errors)
+
+    def test_invalid_take_profit(self):
+        """Negative take profit should fail."""
+        config = BotConfig(take_profit_pct=-10.0)
+        errors = config.validate()
+        assert any("Take profit" in err for err in errors)
+
+
+class TestPosition:
+    """Test position tracking and P&L calculations."""
+
+    def test_position_pnl_profit(self):
+        """Test profit calculation."""
+        position = Position(
+            token_address="TEST123",
+            entry_time=datetime.now(),
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol_invested=1.0,
+            peak_price=0.000001,
+        )
+
+        position.update_price(0.000002)  # Price doubles
+
+        assert position.get_pnl_percent() == 100.0
+        assert position.get_pnl_sol() == 1.0
+
+    def test_position_pnl_loss(self):
+        """Test loss calculation."""
+        position = Position(
+            token_address="TEST123",
+            entry_time=datetime.now(),
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol_invested=1.0,
+            peak_price=0.000001,
+        )
+
+        position.update_price(0.0000005)  # Price halves
+
+        assert position.get_pnl_percent() == -50.0
+        assert position.get_pnl_sol() == -0.5
+
+    def test_net_pnl_subtracts_fees(self):
+        """A price gain can still be a wallet loss once fees are counted.
+
+        Real trade: 0.01 SOL into a token that rose 3.10%, reported as a win, while
+        the wallet lost SOL — a flat 0.002 SOL/tx priority fee is 20% per side.
+        """
+        # entry_price is SOL/token: 0.01 SOL bought 1046.99 tokens.
+        entry = 0.01 / 1046.99
+        position = Position(
+            token_address="TEST123",
+            entry_time=datetime.now(),
+            entry_price=entry,
+            amount_tokens=1046.99,
+            amount_sol_invested=0.01,
+            peak_price=entry,
+            entry_fees_sol=0.002005,  # 2_000_000 priority + 5_000 base
+        )
+        position.update_price(entry * 1.031)  # +3.10%, as reported
+        position.exit_fees_sol = 0.002005
+
+        assert position.get_pnl_percent() == pytest.approx(3.10, abs=0.01)  # gross
+        assert position.total_fees_sol == pytest.approx(0.00401)
+        # Net is deeply negative despite the "winning" trade.
+        assert position.get_net_pnl_sol() == pytest.approx(
+            0.01 * 0.031 - 0.00401, abs=1e-6
+        )
+        assert position.get_net_pnl_percent() < -30
+        assert position.get_net_pnl_percent() == pytest.approx(
+            (0.01 * 0.031 - 0.00401) / 0.012005 * 100, abs=0.01
+        )
+
+    def test_net_pnl_without_fees_matches_gross(self):
+        """No fees recorded → net equals gross (sim paths, back-compat)."""
+        position = Position(
+            token_address="TEST123",
+            entry_time=datetime.now(),
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol_invested=1.0,
+            peak_price=0.000001,
+        )
+        position.update_price(0.000002)
+        assert position.get_net_pnl_sol() == position.get_pnl_sol()
+        assert position.get_net_pnl_percent() == pytest.approx(100.0)
+
+    def test_exit_triggers_stay_price_based_despite_fees(self):
+        """Fees must NOT move stop-loss/take-profit: a 25% stop means PRICE -25%."""
+        position = Position(
+            token_address="TEST123",
+            entry_time=datetime.now(),
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol_invested=1.0,
+            peak_price=0.000001,
+            entry_fees_sol=0.5,  # absurd fee to prove it can't leak into triggers
+        )
+        position.update_price(0.0000012)  # +20% price
+        assert position.should_take_profit(20.0) is True
+        assert position.should_stop_loss(25.0) is False
+        assert position.get_net_pnl_percent() < 0  # but the wallet is down
+
+    def test_take_profit_trigger(self):
+        """Test take profit condition."""
+        position = Position(
+            token_address="TEST123",
+            entry_time=datetime.now(),
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol_invested=1.0,
+            peak_price=0.000001,
+        )
+
+        position.update_price(0.000003)  # +200%
+
+        assert position.should_take_profit(100.0) is True  # Target 100%
+        assert position.should_take_profit(300.0) is False  # Target 300%
+
+    def test_stop_loss_trigger(self):
+        """Test stop loss condition."""
+        position = Position(
+            token_address="TEST123",
+            entry_time=datetime.now(),
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol_invested=1.0,
+            peak_price=0.000001,
+        )
+
+        position.update_price(0.0000005)  # -50%
+
+        assert position.should_stop_loss(25.0) is True  # 25% stop
+        assert position.should_stop_loss(75.0) is False  # 75% stop
+
+    def test_trailing_stop_trigger(self):
+        """Test trailing stop from peak."""
+        position = Position(
+            token_address="TEST123",
+            entry_time=datetime.now(),
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol_invested=1.0,
+            peak_price=0.000001,
+        )
+
+        # Price goes up
+        position.update_price(0.000003)  # Peak at 0.000003
+        assert position.peak_price == 0.000003
+
+        # Price drops 20% from peak
+        position.update_price(0.0000024)
+
+        assert position.should_trailing_stop(15.0) is True  # 15% trail
+        assert position.should_trailing_stop(25.0) is False  # 25% trail
+
+
+class TestPositionManager:
+    """Test portfolio management."""
+
+    def setup_method(self):
+        """Setup test environment."""
+        config = BotConfig()
+        logger = FenrirLogger(config)
+        self.manager = PositionManager(config, logger)
+
+    def test_open_position(self):
+        """Test opening a position."""
+        self.manager.open_position(
+            token_address="TOKEN1",
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol=1.0,
+        )
+
+        assert len(self.manager.positions) == 1
+        assert "TOKEN1" in self.manager.positions
+
+    def test_close_position(self):
+        """Test closing a position."""
+        self.manager.open_position(
+            token_address="TOKEN1",
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol=1.0,
+        )
+
+        position = self.manager.close_position("TOKEN1", "Test exit")
+
+        assert len(self.manager.positions) == 0
+        assert position is not None
+        assert position.token_address == "TOKEN1"
+
+    def test_portfolio_summary(self):
+        """Test portfolio summary calculation."""
+        self.manager.open_position(
+            token_address="TOKEN1",
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol=1.0,
+        )
+        self.manager.open_position(
+            token_address="TOKEN2",
+            entry_price=0.000002,
+            amount_tokens=500_000,
+            amount_sol=1.0,
+        )
+
+        self.manager.update_prices(
+            {
+                "TOKEN1": 0.000002,  # +100%
+                "TOKEN2": 0.000001,  # -50%
+            }
+        )
+
+        summary = self.manager.get_portfolio_summary()
+
+        assert summary["num_positions"] == 2
+        assert summary["total_invested_sol"] == 2.0
+        assert summary["total_pnl_sol"] == pytest.approx(0.5, abs=0.01)
+        assert summary["total_pnl_pct"] == pytest.approx(25.0, abs=1.0)
+
+    def test_exit_conditions(self):
+        """Test automatic exit signal detection."""
+        self.manager.open_position(
+            token_address="TOKEN1",
+            entry_price=0.000001,
+            amount_tokens=1_000_000,
+            amount_sol=1.0,
+        )
+
+        self.manager.update_prices({"TOKEN1": 0.000003})  # +200%
+
+        exits = self.manager.check_exit_conditions()
+
+        assert len(exits) == 1
+        assert exits[0][0] == "TOKEN1"
+        assert "Take Profit" in exits[0][1]
+
+
+class TestTradingPresets:
+    """Test mode-specific configuration presets."""
+
+    def test_conservative_preset_valid(self):
+        # Non-simulation modes require a private key; AI (enabled by default)
+        # requires a key too — supply dummies so validation is env-independent.
+        config = BotConfig.from_mode(
+            TradingMode.CONSERVATIVE, private_key="dummykey", ai_api_key="dummy"
+        )
+        errors = config.validate()
+        assert len(errors) == 0, f"Validation errors: {errors}"
+        assert config.mode == TradingMode.CONSERVATIVE
+        assert config.buy_amount_sol == 0.05
+        assert config.max_slippage_bps == 300
+        assert config.stop_loss_pct == 15.0
+        assert config.ai_min_confidence_to_buy == 0.75
+
+    def test_aggressive_preset_valid(self):
+        config = BotConfig.from_mode(
+            TradingMode.AGGRESSIVE, private_key="dummykey", ai_api_key="dummy"
+        )
+        errors = config.validate()
+        assert len(errors) == 0, f"Validation errors: {errors}"
+        assert config.mode == TradingMode.AGGRESSIVE
+        assert config.buy_amount_sol == 0.2
+        assert config.priority_fee_lamports == 1_000_000
+
+    def test_degen_preset_valid(self):
+        config = BotConfig.from_mode(
+            TradingMode.DEGEN, private_key="dummykey", ai_api_key="dummy"
+        )
+        errors = config.validate()
+        assert len(errors) == 0, f"Validation errors: {errors}"
+        assert config.mode == TradingMode.DEGEN
+        assert config.max_slippage_bps == 1500
+        assert config.take_profit_pct == 500.0
+
+    def test_simulation_preset_valid(self):
+        config = BotConfig.from_mode(TradingMode.SIMULATION, ai_api_key="dummy")
+        errors = config.validate()
+        assert len(errors) == 0, f"Validation errors: {errors}"
+
+    def test_preset_overrides_work(self):
+        config = BotConfig.from_mode(TradingMode.CONSERVATIVE, buy_amount_sol=0.01)
+        assert config.buy_amount_sol == 0.01
+        assert config.stop_loss_pct == 15.0
+
+    def test_all_presets_have_valid_stop_loss(self):
+        for mode in TradingMode:
+            config = BotConfig.from_mode(mode)
+            assert config.stop_loss_pct < 100.0, f"{mode.value} has invalid stop_loss"
+
+    def test_all_presets_have_positive_priority_fee(self):
+        for mode in TradingMode:
+            config = BotConfig.from_mode(mode)
+            assert (
+                config.priority_fee_lamports > 0
+            ), f"{mode.value} has zero priority fee"
+
+    def test_presets_risk_ordering(self):
+        conservative = BotConfig.from_mode(TradingMode.CONSERVATIVE)
+        aggressive = BotConfig.from_mode(TradingMode.AGGRESSIVE)
+        degen = BotConfig.from_mode(TradingMode.DEGEN)
+
+        assert (
+            conservative.buy_amount_sol
+            < aggressive.buy_amount_sol
+            < degen.buy_amount_sol
+        )
+        assert (
+            conservative.stop_loss_pct < aggressive.stop_loss_pct < degen.stop_loss_pct
+        )
+        assert (
+            conservative.max_slippage_bps
+            < aggressive.max_slippage_bps
+            < degen.max_slippage_bps
+        )
+
+
+class TestWalletManager:
+    """Test wallet functionality."""
+
+    def test_simulation_wallet(self):
+        """Test simulation mode generates throwaway wallet."""
+        wallet = WalletManager("", simulation_mode=True)
+
+        address = wallet.get_address()
+        assert len(address) > 0
+        assert wallet.simulation_mode is True
+
+    def test_invalid_private_key(self):
+        """Test invalid private key handling."""
+        with pytest.raises(ValueError):
+            WalletManager("invalid_key", simulation_mode=False)
+
+
+def run_tests():
+    """Run tests without pytest."""
+    print("Running FENRIR Test Suite")
+    print("=" * 70)
+
+    test_classes = [
+        TestBotConfig(),
+        TestPosition(),
+        TestPositionManager(),
+        TestWalletManager(),
+    ]
+
+    total_tests = 0
+    passed_tests = 0
+
+    for test_class in test_classes:
+        class_name = test_class.__class__.__name__
+        print(f"\n{class_name}")
+        print("-" * 70)
+
+        for method_name in dir(test_class):
+            if method_name.startswith("test_"):
+                total_tests += 1
+                try:
+                    if hasattr(test_class, "setup_method"):
+                        test_class.setup_method()
+
+                    method = getattr(test_class, method_name)
+                    method()
+
+                    print(f"  PASS: {method_name}")
+                    passed_tests += 1
+                except Exception as e:
+                    print(f"  FAIL: {method_name}: {str(e)}")
+
+    print("\n" + "=" * 70)
+    print(f"Results: {passed_tests}/{total_tests} tests passed")
+
+    if passed_tests == total_tests:
+        print("All tests passed!")
+        return 0
+    else:
+        print(f"{total_tests - passed_tests} tests failed")
+        return 1
+
+
+if __name__ == "__main__":
+    try:
+        import pytest
+
+        pytest.main([__file__, "-v"])
+    except ImportError:
+        print("pytest not found, running simple test suite...")
+        exit(run_tests())

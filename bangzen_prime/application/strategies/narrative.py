@@ -39,8 +39,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("bangzen.NarrativeTracker")
 
@@ -240,7 +243,9 @@ class NarrativeTrackerStrategy(TradingStrategy):
             ai_entry_timeout=config.ai_entry_timeout_seconds,
         )
 
-    def update_narrative_leader(self, narrative: str, leader_data: dict[str, Any]) -> None:
+    def update_narrative_leader(
+        self, narrative: str, leader_data: dict[str, Any]
+    ) -> None:
         """
         Update the known state of a narrative leader.
         Called externally when a leader token is detected pumping.
@@ -338,13 +343,21 @@ class NarrativeTrackerStrategy(TradingStrategy):
             )
 
         if mcap < self.params.min_market_cap_usd:
-            failures.append(f"MCap ${mcap:,.0f} < min ${self.params.min_market_cap_usd:,.0f}")
+            failures.append(
+                f"MCap ${mcap:,.0f} < min ${self.params.min_market_cap_usd:,.0f}"
+            )
         if mcap > self.params.max_market_cap_usd:
-            failures.append(f"MCap ${mcap:,.0f} > max ${self.params.max_market_cap_usd:,.0f}")
+            failures.append(
+                f"MCap ${mcap:,.0f} > max ${self.params.max_market_cap_usd:,.0f}"
+            )
         if liq < self.params.min_liquidity_usd:
-            failures.append(f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}")
+            failures.append(
+                f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}"
+            )
         if vol_1h < self.params.min_volume_1h_usd:
-            failures.append(f"Vol(1h) ${vol_1h:,.0f} < min ${self.params.min_volume_1h_usd:,.0f}")
+            failures.append(
+                f"Vol(1h) ${vol_1h:,.0f} < min ${self.params.min_volume_1h_usd:,.0f}"
+            )
         if txns_1h < self.params.min_txns_1h:
             failures.append(f"Txns(1h) {txns_1h} < min {self.params.min_txns_1h}")
 

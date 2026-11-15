@@ -12,8 +12,11 @@ on the graduation pump. Higher liquidity = lower risk, but also
 lower potential upside compared to fresh sniping.
 """
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 
 class GraduationStrategy(TradingStrategy):

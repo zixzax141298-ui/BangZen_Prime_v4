@@ -33,8 +33,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("bangzen.VolumeAnomaly")
 
@@ -201,9 +204,13 @@ class VolumeAnomalyStrategy(TradingStrategy):
 
         # Market cap range
         if mcap < self.params.min_market_cap_usd:
-            failures.append(f"MCap ${mcap:,.0f} < min ${self.params.min_market_cap_usd:,.0f}")
+            failures.append(
+                f"MCap ${mcap:,.0f} < min ${self.params.min_market_cap_usd:,.0f}"
+            )
         if mcap > self.params.max_market_cap_usd:
-            failures.append(f"MCap ${mcap:,.0f} > max ${self.params.max_market_cap_usd:,.0f}")
+            failures.append(
+                f"MCap ${mcap:,.0f} > max ${self.params.max_market_cap_usd:,.0f}"
+            )
 
         # Volume anomaly ratio
         ratio = vol_24h / mcap if mcap > 0 else 0.0
@@ -220,7 +227,9 @@ class VolumeAnomalyStrategy(TradingStrategy):
 
         # Liquidity for exit
         if liq < self.params.min_liquidity_usd:
-            failures.append(f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}")
+            failures.append(
+                f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}"
+            )
 
         # Dip entry timing
         if change_5m > self.params.max_entry_price_change_5m_pct:
@@ -235,7 +244,9 @@ class VolumeAnomalyStrategy(TradingStrategy):
             )
 
         if failures:
-            logger.debug(f"Volume anomaly reject {token_address[:8]}...: {' | '.join(failures)}")
+            logger.debug(
+                f"Volume anomaly reject {token_address[:8]}...: {' | '.join(failures)}"
+            )
             return None
 
         signal = VolumeAnomalySignal(

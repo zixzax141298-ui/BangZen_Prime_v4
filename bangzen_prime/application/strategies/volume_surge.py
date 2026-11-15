@@ -44,8 +44,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("BANGZEN.VolumeSurge")
 
@@ -128,7 +131,9 @@ class VolumeSurgeStrategy(TradingStrategy):
     max_concurrent_positions = 3
     uses_market_data = True
 
-    def __init__(self, config: BotConfig, params: VolumeSurgeConfig | None = None) -> None:
+    def __init__(
+        self, config: BotConfig, params: VolumeSurgeConfig | None = None
+    ) -> None:
         super().__init__()
         self.config = config
         self.params = params or VolumeSurgeConfig()
@@ -200,16 +205,24 @@ class VolumeSurgeStrategy(TradingStrategy):
         turnover = (vol_24h / mcap) if mcap > 0 else 0.0
 
         failures = []
-        if not (self.params.min_market_cap_usd <= mcap <= self.params.max_market_cap_usd):
+        if not (
+            self.params.min_market_cap_usd <= mcap <= self.params.max_market_cap_usd
+        ):
             failures.append(
                 f"mcap ${mcap:,.0f} outside "
                 f"${self.params.min_market_cap_usd:,.0f}–${self.params.max_market_cap_usd:,.0f}"
             )
         if age_minutes < self.params.min_age_minutes:
-            failures.append(f"age {age_minutes:.0f}m < {self.params.min_age_minutes:.0f}m")
+            failures.append(
+                f"age {age_minutes:.0f}m < {self.params.min_age_minutes:.0f}m"
+            )
         if vol_24h < self.params.min_volume_24h_usd:
-            failures.append(f"Vol24h ${vol_24h:,.0f} < ${self.params.min_volume_24h_usd:,.0f}")
-        if not (self.params.min_turnover_24h <= turnover <= self.params.max_turnover_24h):
+            failures.append(
+                f"Vol24h ${vol_24h:,.0f} < ${self.params.min_volume_24h_usd:,.0f}"
+            )
+        if not (
+            self.params.min_turnover_24h <= turnover <= self.params.max_turnover_24h
+        ):
             failures.append(
                 f"turnover {turnover:.2f}x outside "
                 f"{self.params.min_turnover_24h:.1f}x–{self.params.max_turnover_24h:.0f}x"
@@ -226,7 +239,9 @@ class VolumeSurgeStrategy(TradingStrategy):
         if share is None:
             failures.append("1h volume share unavailable")
         elif share < self.params.min_volume_1h_share:
-            failures.append(f"1h vol share {share:.1%} < {self.params.min_volume_1h_share:.0%}")
+            failures.append(
+                f"1h vol share {share:.1%} < {self.params.min_volume_1h_share:.0%}"
+            )
         if liq < self.params.min_liquidity_usd:
             failures.append(f"LP ${liq:,.0f} < ${self.params.min_liquidity_usd:,.0f}")
         if change_1h > self.params.max_price_change_1h_pct:
@@ -235,7 +250,9 @@ class VolumeSurgeStrategy(TradingStrategy):
             )
 
         if failures:
-            logger.debug("VolumeSurge reject %s...: %s", token_address[:8], " | ".join(failures))
+            logger.debug(
+                "VolumeSurge reject %s...: %s", token_address[:8], " | ".join(failures)
+            )
             return None
         assert ratio is not None and share is not None
 

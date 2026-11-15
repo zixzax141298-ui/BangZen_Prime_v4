@@ -39,8 +39,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("bangzen.Momentum")
 
@@ -204,7 +207,9 @@ class MomentumStrategy(TradingStrategy):
         pair_address = getattr(market_data, "pair_address", "") or ""
 
         # Age gate — silent skip if outside window.
-        if not (self.params.min_age_minutes <= age_minutes <= self.params.max_age_minutes):
+        if not (
+            self.params.min_age_minutes <= age_minutes <= self.params.max_age_minutes
+        ):
             return None
 
         # Volume acceleration: recent per-minute pace vs. the trailing hourly pace.
@@ -242,7 +247,9 @@ class MomentumStrategy(TradingStrategy):
 
         # Absolute participation floor.
         if vol_1h < self.params.min_volume_1h_usd:
-            failures.append(f"Vol(1h) ${vol_1h:,.0f} < min ${self.params.min_volume_1h_usd:,.0f}")
+            failures.append(
+                f"Vol(1h) ${vol_1h:,.0f} < min ${self.params.min_volume_1h_usd:,.0f}"
+            )
 
         # Buy-side dominance.
         if buy_pressure < self.params.min_buy_pressure_5m:
@@ -252,10 +259,14 @@ class MomentumStrategy(TradingStrategy):
 
         # Liquidity for exit.
         if liq < self.params.min_liquidity_usd:
-            failures.append(f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}")
+            failures.append(
+                f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}"
+            )
 
         if failures:
-            logger.debug(f"Momentum reject {token_address[:8]}...: {' | '.join(failures)}")
+            logger.debug(
+                f"Momentum reject {token_address[:8]}...: {' | '.join(failures)}"
+            )
             return None
 
         signal = MomentumSignal(

@@ -40,8 +40,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from bangzen_prime.application.strategies.base_strategy import (
+    TradeParams,
+    TradingStrategy,
+)
 from bangzen_prime.config import BotConfig
-from bangzen_prime.application.strategies.base_strategy import TradeParams, TradingStrategy
 
 logger = logging.getLogger("bangzen.MeanReversion")
 
@@ -129,7 +132,9 @@ class MeanReversionStrategy(TradingStrategy):
     max_concurrent_positions = 3
     uses_market_data = True
 
-    def __init__(self, config: BotConfig, params: MeanReversionConfig | None = None) -> None:
+    def __init__(
+        self, config: BotConfig, params: MeanReversionConfig | None = None
+    ) -> None:
         super().__init__()
         self.config = config
         # ``params`` overrides the Solana-tuned defaults (e.g. widened age/floors for a
@@ -200,7 +205,9 @@ class MeanReversionStrategy(TradingStrategy):
         pair_address = getattr(market_data, "pair_address", "") or ""
 
         # Age gate — silent skip if outside window.
-        if not (self.params.min_age_minutes <= age_minutes <= self.params.max_age_minutes):
+        if not (
+            self.params.min_age_minutes <= age_minutes <= self.params.max_age_minutes
+        ):
             return None
 
         failures = []
@@ -238,12 +245,18 @@ class MeanReversionStrategy(TradingStrategy):
 
         # Participation + exit liquidity.
         if vol_1h < self.params.min_volume_1h_usd:
-            failures.append(f"Vol(1h) ${vol_1h:,.0f} < min ${self.params.min_volume_1h_usd:,.0f}")
+            failures.append(
+                f"Vol(1h) ${vol_1h:,.0f} < min ${self.params.min_volume_1h_usd:,.0f}"
+            )
         if liq < self.params.min_liquidity_usd:
-            failures.append(f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}")
+            failures.append(
+                f"LP ${liq:,.0f} < min ${self.params.min_liquidity_usd:,.0f}"
+            )
 
         if failures:
-            logger.debug(f"Mean reversion reject {token_address[:8]}...: {' | '.join(failures)}")
+            logger.debug(
+                f"Mean reversion reject {token_address[:8]}...: {' | '.join(failures)}"
+            )
             return None
 
         signal = MeanReversionSignal(
