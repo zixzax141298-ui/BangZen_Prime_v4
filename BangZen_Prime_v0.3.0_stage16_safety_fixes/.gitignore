@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Database & Logs
+*.db
+*.sqlite
+*.sqlite3
+reports/
+*.log
+
+# Archives & Local Files
+*.zip
+.env
+.DS_Store
+native/rust/target/
+*.db*
+*.egg-info/
+.env
+build/
+bangzen-v2-main/

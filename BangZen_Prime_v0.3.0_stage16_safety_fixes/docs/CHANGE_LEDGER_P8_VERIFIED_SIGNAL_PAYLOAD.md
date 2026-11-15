@@ -1,0 +1,24 @@
+# Change Ledger — P8 Verified Telegram Signal Payload
+
+- Objective: provide Telegram with the exact validated Solana asset identity and market provenance used by the accepted signal.
+- Base branch: `feat/p7-mode-aware-telegram-gateway`
+- Base SHA: `5252ccb98067f5de851bff70f9dbe047cac66845`
+- Head branch: `feat/p8-verified-telegram-signal-payload`
+- Head SHA: record final branch head from GitHub after last commit.
+- Files modified:
+  - `bangzen_prime/domain/tokens.py`: add source field to PairSnapshot, defaulting to UNSPECIFIED.
+  - `bangzen_prime/domain/signals.py`: validate chain/mint and pair identity against aggregate UUIDs; require complete metadata tuple; include metadata and score in SignalGenerated.
+  - `bangzen_prime/application/use_cases.py`: pass selected PairSnapshot metadata into accepted Signal.
+  - `bangzen_prime/infrastructure/adapters/market_data/dexscreener.py`: mark observations with DexScreener provider source.
+  - `bangzen_prime/application/notifications.py`: display validated mint, symbol, pair, DEX, provider source, observation time, reference levels, score, and confidence; fallback explicitly for legacy events.
+  - `docs/TELEGRAM_SIGNAL_GATEWAY.md`: update event contract and limitations.
+- Files added:
+  - `tests/unit/test_signal_notification_payload.py`
+  - `docs/decisions/ADR-0004-verified-telegram-signal-payload.md`
+  - `docs/CHANGE_LEDGER_P8_VERIFIED_SIGNAL_PAYLOAD.md`
+- Compatibility: metadata arguments are optional for legacy direct callers; production `build_signal` supplies the complete validated tuple. Legacy events remain readable.
+- Safety: no thresholds, score weights, risk limits, wallet, signing, or execution behavior changed.
+- Tests: NOT RUN in this authoring session. Intended command: `python -m unittest tests.unit.test_signal_notification_payload`.
+- CI: `python3 tools/ci.py` NOT RUN.
+- Static/security scans: NOT RUN.
+- Merge: not merged; PR #55 is the parent dependency and must be reviewed first.

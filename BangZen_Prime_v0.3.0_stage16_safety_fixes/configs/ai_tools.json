@@ -1,0 +1,203 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "check_sybil_cluster",
+      "description": "Menganalisis hubungan pendanaan antar top holders untuk menemukan pola koordinasi/Sybil. Indikator investigasi, bukan bukti tunggal.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mint": {
+            "type": "string",
+            "description": "Alamat mint token Solana"
+          }
+        },
+        "required": [
+          "mint"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_honeypot",
+      "description": "Memeriksa risiko honeypot dan anomali pajak/kemampuan transfer sebagai analisis keselamatan. Tidak memberi instruksi transaksi.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mint": {
+            "type": "string",
+            "description": "Alamat mint token Solana"
+          }
+        },
+        "required": [
+          "mint"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_smart_money_quality",
+      "description": "Menganalisis kualitas dan perilaku historis wallet smart money. Skor bukan probabilitas atau rekomendasi transaksi.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "audit_data": {
+            "type": "object",
+            "description": "Data audit (smart_money_count, smart_money_sol, kurva SOL)"
+          }
+        },
+        "required": [
+          "audit_data"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_sequential_bundle",
+      "description": "Mendeteksi pola koordinasi wallet dari sumber pendanaan sama dan waktu transaksi berdekatan.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "List transaksi awal (wallet, funder, timestamp, type)"
+          }
+        },
+        "required": [
+          "transactions"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_pre_dump_radar",
+      "description": "Menganalisis tekanan jual, penurunan likuiditas, penjualan dev, dan sell-velocity spike untuk investigasi risiko.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "current_liq": {
+            "type": "number",
+            "description": "Likuiditas saat ini"
+          },
+          "initial_liq": {
+            "type": "number",
+            "description": "Likuiditas awal"
+          },
+          "recent_dev_sell_pct": {
+            "type": "number",
+            "description": "Persentase dev menjual"
+          },
+          "buys_m5": {
+            "type": "integer",
+            "description": "Jumlah transaksi beli 5 menit terakhir"
+          },
+          "sells_m5": {
+            "type": "integer",
+            "description": "Jumlah transaksi jual 5 menit terakhir"
+          }
+        },
+        "required": [
+          "current_liq",
+          "initial_liq",
+          "recent_dev_sell_pct",
+          "buys_m5",
+          "sells_m5"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "score_metadata_narrative",
+      "description": "Menganalisis konteks narasi metadata. Sinyal narasi lemah dan tidak menggantikan bukti on-chain.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Deskripsi token"
+          },
+          "website": {
+            "type": "string",
+            "description": "URL website token"
+          }
+        },
+        "required": [
+          "description"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "fetch_news_keywords",
+      "description": "Mengambil konteks berita/makro relevan. Sumber dan waktu wajib ditandai; berita bukan bukti on-chain.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_cross_chain_copycat",
+      "description": "Menganalisis kemungkinan token meniru simbol/narasi aset lintas-chain untuk mengidentifikasi risiko copycat.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "solana_token_symbol": {
+            "type": "string",
+            "description": "Simbol koin Solana"
+          },
+          "token_age_min": {
+            "type": "number",
+            "description": "Umur koin dalam menit"
+          }
+        },
+        "required": [
+          "solana_token_symbol",
+          "token_age_min"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_autopsy_dna",
+      "description": "Membandingkan pola token dengan riwayat rugpull/kematian token. Kemiripan adalah petunjuk, bukan kepastian.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "setup": {
+            "type": "string",
+            "description": "Nama setup strategi"
+          },
+          "current_liq": {
+            "type": "number",
+            "description": "Likuiditas saat ini"
+          }
+        },
+        "required": [
+          "setup",
+          "current_liq"
+        ]
+      }
+    }
+  }
+]

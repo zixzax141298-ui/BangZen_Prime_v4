@@ -1,6 +1,6 @@
 import asyncio
 
-from bangzen_prime.application.strategy_dispatcher import StrategyDispatcher
+from bangzen_prime.strategies.strategy_dispatcher import StrategyDispatcher
 
 
 async def main():

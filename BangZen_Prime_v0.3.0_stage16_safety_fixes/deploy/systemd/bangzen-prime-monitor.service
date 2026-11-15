@@ -1,0 +1,38 @@
+# Template unit systemd. Dirender oleh scripts/install_vps.sh ke deploy/generated/.
+# Placeholder: __APP_USER__, __APP_DIR__, __VENV_DIR__. Paper only; live dan broadcast dikunci di kode.
+[Unit]
+Description=BangZen Prime paper monitor (signal and paper only)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=__APP_USER__
+WorkingDirectory=__APP_DIR__
+# Kill switch and env file use absolute paths, so the working directory cannot hide them.
+Environment=BANGZEN_ENV_FILE=__APP_DIR__/.env
+Environment=BANGZEN_HALT_FLAG_PATH=__APP_DIR__/HALT.flag
+ExecStart=__VENV_DIR__/bin/bangzen-prime monitor --watchlist __APP_DIR__/watchlist.txt --interval-seconds 60 --scans-per-minute 20
+# Ctrl+C di CLI ditangani sebagai berhenti normal oleh operator.
+KillSignal=SIGINT
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=30
+MemoryMax=512M
+StandardOutput=journal
+StandardError=journal
+
+# Pengerasan dasar. Nilai ini belum diuji di VPS nyata.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=__APP_DIR__
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

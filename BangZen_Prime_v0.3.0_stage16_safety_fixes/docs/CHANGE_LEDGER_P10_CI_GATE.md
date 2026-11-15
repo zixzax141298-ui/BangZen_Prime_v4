@@ -1,0 +1,21 @@
+# Change Ledger — P10 Mandatory Quality and Security Gate
+
+- Objective: implement the repository constitution's required `python3 tools/ci.py` gate and make GitHub Actions execute the real Python and Rust checks.
+- Base branch: `main`
+- Base SHA: `345313061e2b6bc3ef3d98d366d9138c2655cc15`
+- Head branch: `ci/p10-enforce-institutional-quality-gate`
+- Implementation head before the final ledger-only update: `0e71f3f27459b6667cae9282064329597f619e30`.
+- Files added:
+  - `tools/ci.py`: fail-closed orchestration for Black, Ruff, Mypy, Bandit, Semgrep, Safety, Pip-Audit, compileall, canonical unittest, Pytest, Cargo fmt, Cargo test, and Cargo Audit.
+  - `docs/CHANGE_LEDGER_P10_CI_GATE.md`
+- Files modified:
+  - `.github/workflows/ci.yml`: replaces placeholder Rust build with actual dependency lock generation and mandatory gate invocation; runs Python 3.11 and 3.12 without matrix fail-fast.
+  - `pyproject.toml`: adds Bandit, Semgrep, Safety CLI 3, and Pip-Audit to development tools.
+  - `docs/TESTING.md`: documents the gate and required Safety credential.
+- Safety: no wallet, key, signer, transaction, risk threshold, or trading behavior changed. No tests were removed or weakened.
+- Safety credential: GitHub Actions must have the repository secret `SAFETY_API_KEY`. The gate reports BLOCKED and exits non-zero if it is missing.
+- Prior CI evidence: workflow run `43330558473` failed twice in approximately three seconds; both attempts reported runner ID 0 and no executed steps. Logs were unavailable (`BlobNotFound`). This is insufficient evidence to diagnose a code failure; a fresh run on this PR is required.
+- Tests in this authoring session: NOT RUN. This environment cannot access the private GitHub repository through a local git clone.
+- `python3 tools/ci.py`: NOT RUN.
+- Merge: not merged. Owner review and fully green CI are required.
+- Rollback: revert this PR to restore the previous workflow and remove the gate. Do not remove or bypass the required gate while the constitution remains unchanged.

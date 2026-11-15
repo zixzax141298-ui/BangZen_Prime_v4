@@ -1,0 +1,3 @@
+# One Solana mint per line. Blank lines and lines starting with # are ignored.
+# Replace these examples with the tokens you want watched (paper only).
+So11111111111111111111111111111111111111112

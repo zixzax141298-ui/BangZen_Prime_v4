@@ -1,0 +1,260 @@
+{
+  "schema_version": "1.0",
+  "audit_scope": {
+    "repository": "ripsterxiui98-coder/BangZenPrime-v3",
+    "branch": "main",
+    "method": "recursive Git tree plus targeted source-file inspection",
+    "limitations": "Static path/source inspection only; does not prove runtime construction, dependency injection, production activation, or complete behavioral correctness."
+  },
+  "declared_count": 29,
+  "category_counts": {
+    "MARKET_READING": 8,
+    "RISK_MANAGEMENT": 10,
+    "EXECUTION": 6,
+    "CORE_STRATEGY": 5
+  },
+  "ai_manager_policy": {
+    "purpose": "EVIDENCE_ANALYSIS_AND_ON_DEMAND_WEAPON_SELECTION_ONLY",
+    "max_selected_weapons": 1,
+    "may_select_zero": true,
+    "may_not_manage_finances_or_balances": true,
+    "may_not_create_buy_sell_or_tp_sl_plans": true,
+    "may_not_authorize_or_execute_transactions": true,
+    "may_not_access_execution_weapons": true,
+    "risk_safety_final_veto": true
+  },
+  "weapons": [
+    {
+      "id": "lp_sniper_adapter",
+      "category": "MARKET_READING",
+      "path": "bangzen_prime/infrastructure/adapters/market_data/lp_sniper_adapter.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Analysis-only candidate; LP observation, not execution approval."
+    },
+    {
+      "id": "smart_money_engine",
+      "category": "MARKET_READING",
+      "path": "bangzen_prime/application/smart_money_engine.py",
+      "status": "IMPLEMENTED_STUB",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Current file is a thin wrapper; substantive wallet intelligence is in smart_money_adapter.py."
+    },
+    {
+      "id": "dormant_whale_adapter",
+      "category": "MARKET_READING",
+      "path": null,
+      "status": "NOT_FOUND",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "No dedicated dormant-whale adapter found in the audited main tree."
+    },
+    {
+      "id": "memo_hype_adapter",
+      "category": "MARKET_READING",
+      "path": "bangzen_prime/infrastructure/adapters/market_data/lunarcrush.py",
+      "status": "PARTIAL_RELATED_CAPABILITY",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "LunarCrush reports Solana ecosystem sentiment, not token-specific hype. Do not treat as equivalent without a token-level design."
+    },
+    {
+      "id": "news_adapter",
+      "category": "MARKET_READING",
+      "path": "bangzen_prime/infrastructure/adapters/market_data/news_adapter.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "External news keyword context; provenance and freshness required."
+    },
+    {
+      "id": "metadata_scorer",
+      "category": "MARKET_READING",
+      "path": "bangzen_prime/domain/metadata_scorer.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Metadata/narrative analysis; low-weight contextual evidence only."
+    },
+    {
+      "id": "cross_chain_radar",
+      "category": "MARKET_READING",
+      "path": "bangzen_prime/infrastructure/adapters/market_data/cross_chain_radar_adapter.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Cross-chain trend/copycat context."
+    },
+    {
+      "id": "copycat_trap",
+      "category": "MARKET_READING",
+      "path": "bangzen_prime/domain/copycat_trap.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Local copycat analysis."
+    },
+    {
+      "id": "honeypot_adapter",
+      "category": "RISK_MANAGEMENT",
+      "path": "bangzen_prime/infrastructure/adapters/onchain/honeypot_adapter.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Safety evidence; deterministic Safety layer should own final enforcement."
+    },
+    {
+      "id": "sybil_adapter",
+      "category": "RISK_MANAGEMENT",
+      "path": "bangzen_prime/infrastructure/adapters/onchain/sybil_adapter.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "On-chain funding-cluster evidence; not proof by itself."
+    },
+    {
+      "id": "sequential_bundle_detector",
+      "category": "RISK_MANAGEMENT",
+      "path": "bangzen_prime/domain/sequential_bundle_detector.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Coordinated early-wallet pattern analysis."
+    },
+    {
+      "id": "dev_predictor_adapter",
+      "category": "RISK_MANAGEMENT",
+      "path": "bangzen_prime/infrastructure/adapters/onchain/dev_predictor_adapter.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Developer history evidence."
+    },
+    {
+      "id": "sibling_tracker_adapter",
+      "category": "RISK_MANAGEMENT",
+      "path": null,
+      "status": "NOT_FOUND",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "No dedicated sibling-token tracker adapter found in the audited main tree."
+    },
+    {
+      "id": "kol_exit_adapter",
+      "category": "RISK_MANAGEMENT",
+      "path": "bangzen_prime/infrastructure/adapters/onchain/kol_exit_adapter.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "KOL wallet exit observations."
+    },
+    {
+      "id": "pre_dump_radar",
+      "category": "RISK_MANAGEMENT",
+      "path": "bangzen_prime/domain/pre_dump_radar.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Downside/pressure warning analysis."
+    },
+    {
+      "id": "sniper_ban_adapter",
+      "category": "RISK_MANAGEMENT",
+      "path": "bangzen_prime/infrastructure/adapters/onchain/sniper_ban_adapter.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Sniper/blacklist observation; mutation and policy ownership must remain outside AI."
+    },
+    {
+      "id": "autopsy_engine",
+      "category": "RISK_MANAGEMENT",
+      "path": "bangzen_prime/application/autopsy_engine.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Historical rug-pattern comparison."
+    },
+    {
+      "id": "anti_sl_hunt",
+      "category": "RISK_MANAGEMENT",
+      "path": "bangzen_prime/risk/anti_sl_hunt.py",
+      "status": "IMPLEMENTED",
+      "ai_manager_access": "ON_DEMAND_ANALYSIS_ONLY",
+      "notes": "Risk calculation helper; not an AI-callable trading instruction."
+    },
+    {
+      "id": "ev_engine",
+      "category": "EXECUTION",
+      "path": "bangzen_prime/application/ev_engine.py",
+      "status": "IMPLEMENTED_RESTRICTED",
+      "ai_manager_access": "DENIED",
+      "notes": "Contains financial EV and position-sizing calculations; never expose to AI Manager."
+    },
+    {
+      "id": "dynamic_slippage",
+      "category": "EXECUTION",
+      "path": "bangzen_prime/risk/dynamic_slippage.py",
+      "status": "IMPLEMENTED_RESTRICTED",
+      "ai_manager_access": "DENIED",
+      "notes": "Execution parameter; never expose to AI Manager."
+    },
+    {
+      "id": "twap_execution",
+      "category": "EXECUTION",
+      "path": "bangzen_prime/execution/twap_execution.py",
+      "status": "IMPLEMENTED_RESTRICTED",
+      "ai_manager_access": "DENIED",
+      "notes": "Order scheduling/execution; never expose to AI Manager."
+    },
+    {
+      "id": "jito_adapter",
+      "category": "EXECUTION",
+      "path": "bangzen_prime/infrastructure/adapters/chain/jito_adapter.py",
+      "status": "IMPLEMENTED_RESTRICTED",
+      "ai_manager_access": "DENIED",
+      "notes": "Submits signed bundles; execution boundary only, never expose to AI Manager."
+    },
+    {
+      "id": "session_manager",
+      "category": "EXECUTION",
+      "path": "bangzen_prime/domain/session_manager.py",
+      "status": "IMPLEMENTED_RESTRICTED",
+      "ai_manager_access": "DENIED",
+      "notes": "Session-based aggression/session context; do not expose to AI Manager."
+    },
+    {
+      "id": "auto_blacklist_manager",
+      "category": "EXECUTION",
+      "path": "bangzen_prime/application/auto_blacklist_manager.py",
+      "status": "IMPLEMENTED_RESTRICTED",
+      "ai_manager_access": "DENIED",
+      "notes": "Operational blacklist mutation; assign to deterministic policy/service, not AI."
+    },
+    {
+      "id": "realistic_pumpfun",
+      "category": "CORE_STRATEGY",
+      "path": "bangzen_prime/application/realistic_pumpfun.py",
+      "status": "IMPLEMENTED_RESTRICTED",
+      "ai_manager_access": "DENIED",
+      "notes": "Generates trade-plan fields including TP/SL; keep outside AI Manager authority."
+    },
+    {
+      "id": "second_life_strategy",
+      "category": "CORE_STRATEGY",
+      "path": "bangzen_prime/application/second_life_strategy.py",
+      "status": "IMPLEMENTED_PLACEHOLDER",
+      "ai_manager_access": "DENIED",
+      "notes": "Current implementation is a placeholder returning is_reviving=False."
+    },
+    {
+      "id": "setup_engine",
+      "category": "CORE_STRATEGY",
+      "path": "bangzen_prime/application/setup_engine.py",
+      "status": "IMPLEMENTED_STUB",
+      "ai_manager_access": "DENIED",
+      "notes": "Current file is a placeholder class; no substantive setup logic found in this file."
+    },
+    {
+      "id": "technical",
+      "category": "CORE_STRATEGY",
+      "path": "bangzen_prime/domain/technical.py",
+      "status": "IMPLEMENTED_RESTRICTED",
+      "ai_manager_access": "DENIED",
+      "notes": "Contains technical/exit signal calculations; deterministic strategy/risk domain, not AI authority."
+    },
+    {
+      "id": "black_ops_engine",
+      "category": "CORE_STRATEGY",
+      "path": "bangzen_prime/application/black_ops_engine.py",
+      "status": "IMPLEMENTED_RESTRICTED",
+      "ai_manager_access": "DENIED",
+      "notes": "Contains BUY_DIP/EXIT-style internal labels; expose only normalized analysis findings, never action authority."
+    }
+  ]
+}

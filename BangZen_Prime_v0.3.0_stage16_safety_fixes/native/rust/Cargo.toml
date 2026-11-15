@@ -1,0 +1,13 @@
+[package]
+name = "bangzen-native"
+version = "0.2.0"
+edition = "2021"
+description = "Latency-sensitive helpers for Bangzen Prime. Optional: Python fallback exists."
+license = "UNLICENSED"
+
+[lib]
+name = "bangzen_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.30.1", features = ["extension-module"] }

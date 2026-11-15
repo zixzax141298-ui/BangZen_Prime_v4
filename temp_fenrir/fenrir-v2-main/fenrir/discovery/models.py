@@ -1,0 +1,362 @@
+#!/usr/bin/env python3
+"""
+FENRIR - Discovery data models
+
+Normalized, chain-agnostic snapshot of a token that the filter engine and scoring
+engine operate on. Chain adapters populate these dataclasses from their own data
+sources (DexScreener market data, RugCheck/GoPlus safety, on-chain holders, …), so
+the shared components never see chain-specific shapes.
+
+Design notes:
+  - Every "safety" field is ``bool | float | None``. ``None`` means the provider
+    did NOT supply the signal (unknown), which is distinct from ``False``/0.0. The
+    universal-safety policy decides whether an unknown fails open or closed.
+  - ``TokenSnapshot`` is a superset of ``fenrir/filters/market.py::MarketData`` — the
+    DexScreener provider produces this and the market filter reads the same fields,
+    so there is a single source of truth for market metrics.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
+
+class Chain(str, Enum):
+    """Supported chains. ``str`` mixin so values serialize cleanly to JSON/env."""
+
+    SOLANA = "solana"
+    ETHEREUM = "ethereum"
+    BNB = "bnb"
+    BASE = "base"
+    ROBINHOOD = "robinhood"  # Robinhood's EVM L2 (DexScreener chainId "robinhood")
+
+    @classmethod
+    def from_dexscreener(cls, chain_id: str | None) -> Chain | None:
+        """Map a DexScreener ``chainId`` to a :class:`Chain` (None if unsupported)."""
+        return _DEXSCREENER_CHAIN_IDS.get((chain_id or "").lower())
+
+    @property
+    def is_evm(self) -> bool:
+        """Whether this is an EVM chain (everything except Solana)."""
+        return self is not Chain.SOLANA
+
+
+# DexScreener chainId → Chain. (DexScreener uses "bsc" for BNB Chain.)
+_DEXSCREENER_CHAIN_IDS: dict[str, Chain] = {
+    "solana": Chain.SOLANA,
+    "ethereum": Chain.ETHEREUM,
+    "bsc": Chain.BNB,
+    "base": Chain.BASE,
+    "robinhood": Chain.ROBINHOOD,
+}
+
+
+@dataclass
+class SafetySignals:
+    """Contract/liquidity safety signals, provider-supplied.
+
+    Each field is ``None`` when unknown (provider didn't return it) — NOT the same
+    as a negative result. The universal-safety filter treats unknowns per its
+    fail-open/closed policy.
+    """
+
+    mint_disabled: bool | None = None  # mint authority revoked (no new supply)
+    freeze_disabled: bool | None = None  # freeze authority revoked
+    lp_locked_or_burned: bool | None = None  # LP burned or locked
+    lp_locked_pct: float | None = None  # % of LP burned/locked
+    honeypot: bool | None = None  # True = cannot sell (EVM)
+    buy_tax_pct: float | None = None  # EVM buy tax %
+    sell_tax_pct: float | None = None  # EVM sell tax %
+    contract_verified: bool | None = None
+    ownership_renounced: bool | None = None
+    blacklist_present: bool | None = None  # contract can blacklist wallets
+
+    # Bundle / deployer-cluster signals (on-chain, Robinhood chain).
+    # Populated by fenrir.discovery.bundle_check; None = not checked/unknown.
+    bundled_supply_pct: float | None = None  # % of supply in linked launch-window buys
+    largest_cluster_pct: float | None = (
+        None  # % of supply in the largest linked cluster
+    )
+    cluster_count: int | None = None  # linked buyer clusters found
+    deployer_cluster_pct: float | None = (
+        None  # % of supply flowed through deployer-linked wallets
+    )
+    deployer_holding_pct: float | None = None  # % of supply still held by the deployer
+    deployer_distributed_wallets: int | None = (
+        None  # distinct wallets the deployer sent tokens to
+    )
+    deployer_funder_is_serial_launcher: bool | None = (
+        None  # deployer/funder is a known serial launcher
+    )
+
+    # Provider risk score (RugCheck score_normalised / GoPlus-derived), lower=safer.
+    risk_score: float | None = None
+    # Free-form risk labels surfaced by the provider (e.g. "mint live").
+    risk_flags: list[str] = field(default_factory=list)
+
+    @property
+    def is_empty(self) -> bool:
+        """True when NO safety provider contributed anything.
+
+        Distinct from "unknown on one axis": a Solana token with RugCheck data
+        (mint/freeze/LP/risk_score) is not empty even though honeypot/tax are
+        None. Only a total provider miss counts — that's the blind spot we
+        must not score with confidence.
+        """
+        return all(
+            v is None
+            for v in (
+                self.mint_disabled,
+                self.freeze_disabled,
+                self.lp_locked_or_burned,
+                self.honeypot,
+                self.buy_tax_pct,
+                self.sell_tax_pct,
+                self.blacklist_present,
+                self.risk_score,
+            )
+        )
+
+
+@dataclass
+class TokenSnapshot:
+    """Normalized, chain-agnostic snapshot of a token.
+
+    Superset of the DexScreener market metrics plus holder distribution, chain
+    extras (Solana bond/sniper/bundle), socials and a nested :class:`SafetySignals`.
+    Filters/scoring read ONLY this object.
+    """
+
+    # ── Identity ──────────────────────────────────────────────────────
+    chain: Chain
+    token_address: str
+    symbol: str = "???"
+    name: str = "Unknown"
+    pair_address: str | None = None
+    dex_id: str | None = None  # "raydium", "pumpfun", "uniswap", "aerodrome", …
+
+    # ── Pricing / market cap ──────────────────────────────────────────
+    price_usd: float = 0.0
+    market_cap_usd: float = 0.0
+    fdv_usd: float = 0.0
+
+    # ── Liquidity ─────────────────────────────────────────────────────
+    liquidity_usd: float = 0.0
+    liquidity_sol: float | None = None  # Solana post-migration LP in SOL
+
+    # ── Volume ────────────────────────────────────────────────────────
+    volume_5m_usd: float = 0.0
+    volume_1h_usd: float = 0.0
+    volume_6h_usd: float = 0.0
+    volume_24h_usd: float = 0.0
+
+    # ── Transactions (buy pressure) ───────────────────────────────────
+    txns_5m_buys: int = 0
+    txns_5m_sells: int = 0
+    txns_1h_buys: int = 0
+    txns_1h_sells: int = 0
+    txns_24h_buys: int = 0
+    txns_24h_sells: int = 0
+
+    # ── Price change ──────────────────────────────────────────────────
+    price_change_5m_pct: float = 0.0
+    price_change_1h_pct: float = 0.0
+    price_change_24h_pct: float = 0.0
+
+    # ── Age ───────────────────────────────────────────────────────────
+    created_at: datetime | None = None
+    age_minutes: float = 0.0
+
+    # ── Holders / distribution ────────────────────────────────────────
+    holder_count: int | None = None
+    top_holder_pct: float | None = (
+        None  # single largest holder % (pool excluded when known)
+    )
+    top10_holder_pct: float | None = (
+        None  # top-10 holders % (pool excluded) — concentration / bundle proxy
+    )
+    dev_wallet_pct: float | None = None  # creator/deployer holdings %
+
+    # ── Solana-specific launch extras (None off Solana) ───────────────
+    bond_progress_pct: float | None = None  # pump.fun bonding-curve progress
+    bond_inflow_sol: float | None = (
+        None  # SOL into the curve since prev check (velocity)
+    )
+    bond_sol_remaining: float | None = None  # SOL still needed to hit 85 SOL graduation
+    migrated: bool | None = None  # graduated off the curve to an AMM
+    creator_pct: float | None = None
+    sniper_pct: float | None = None  # % held by launch snipers
+    insider_pct: float | None = None  # % held by insider wallets
+    bundle_pct: float | None = None  # % bought in bundled txs
+
+    # ── Community ─────────────────────────────────────────────────────
+    twitter: str | None = None
+    telegram: str | None = None
+    website: str | None = None
+    organic_score: float | None = None  # provider organic-activity score
+
+    # ── Acceleration (poll-over-poll, attached by the scout's AccelTracker) ──
+    accel_txn_growth: float | None = None  # 1h txn count vs previous poll
+    accel_holder_growth: float | None = None  # holder count vs previous poll
+    accel_edge_delta: float | None = None  # 1h buy-pressure delta vs previous poll
+    accel_polls_seen: int = 0  # observations in history, including this one
+
+    # ── Second-life baseline (trailing price/volume history, attached on demand
+    # by fenrir.discovery.second_life) ──
+    base_floor_price_usd: float | None = (
+        None  # median of daily lows — the defended base
+    )
+    base_max_price_usd: float | None = None  # trailing window high (death check)
+    base_median_1h_volume_usd: float | None = None  # median daily volume / 24
+    base_lookback_days: float | None = None  # candles behind the baseline
+
+    # ── Safety ────────────────────────────────────────────────────────
+    safety: SafetySignals = field(default_factory=SafetySignals)
+
+    # Bundle/deployer report dict (fenrir.discovery.bundle_check), attached by
+    # evaluate.py enrichment for the report section; None when not checked.
+    bundle_report: dict[str, Any] | None = None
+
+    # Raw provider payloads for debugging / downstream context.
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    # ── Derived helpers ───────────────────────────────────────────────
+
+    @property
+    def txns_24h_total(self) -> int:
+        return self.txns_24h_buys + self.txns_24h_sells
+
+    @property
+    def buys_exceed_sells(self) -> bool:
+        """More 24h buys than sells (buy pressure)."""
+        return self.txns_24h_buys > self.txns_24h_sells
+
+    @property
+    def buy_pressure_24h(self) -> float:
+        """Buy fraction over 24h. 0.5 when no data (neutral)."""
+        total = self.txns_24h_total
+        return self.txns_24h_buys / total if total > 0 else 0.5
+
+    @property
+    def buy_pressure_5m(self) -> float:
+        """Buy fraction over 5m. 0.5 when no data (neutral) — strategies treat
+        the 5m window as a float, not an optional."""
+        total = self.txns_5m_buys + self.txns_5m_sells
+        return self.txns_5m_buys / total if total > 0 else 0.5
+
+    @property
+    def buy_pressure_1h(self) -> float | None:
+        """Buy fraction over 1h. None when no 1h txn data (neutral unknown)."""
+        total = self.txns_1h_buys + self.txns_1h_sells
+        return self.txns_1h_buys / total if total > 0 else None
+
+    @property
+    def buy_sell_ratio_1h(self) -> float | None:
+        """1h buys/sells ratio. None when no 1h sells AND no buys; inf when buys>0, sells==0."""
+        if self.txns_1h_sells == 0:
+            return float("inf") if self.txns_1h_buys > 0 else None
+        return self.txns_1h_buys / self.txns_1h_sells
+
+    @property
+    def turnover_24h(self) -> float | None:
+        """24h volume / market cap. None when mcap is zero/unknown."""
+        return (
+            self.volume_24h_usd / self.market_cap_usd
+            if self.market_cap_usd > 0
+            else None
+        )
+
+    @property
+    def fee_mcap_24h(self) -> float | None:
+        """Estimated 24h trading fees / market cap. None when turnover unknown.
+
+        Fees ~= 24h volume x the chain's standard AMM take (0.25% Solana
+        PumpSwap/Raydium, 0.30% Robinhood/EVM Uniswap v4). Measured 2026-10-04
+        on 31 safe/successful coins: median 0.61%; only collapsed or
+        farm-shaped coins clear 10% on a 24h window (denominator effect), so
+        this is a history/wash signal, never a buy gate.
+        """
+        t = self.turnover_24h
+        if t is None:
+            return None
+        rate = 0.003 if self.chain is Chain.ROBINHOOD else 0.0025
+        return t * rate
+
+    @property
+    def wash_volume(self) -> bool:
+        """Farm-shaped volume: extreme 24h turnover after a collapse.
+
+        >50x daily turnover with price down >50% on the day is the JOEkin
+        archetype (909x turnover on a -97% mcap) — residual wash/farm flow
+        on a dead coin, not organic demand. Healthy vertical runners show
+        high turnover *with* a positive 24h move, so the drawdown leg keeps
+        them out.
+        """
+        t = self.turnover_24h
+        if t is None or t < 50.0:
+            return False
+        return (self.price_change_24h_pct or 0.0) <= -50.0
+
+    @property
+    def volume_1h_share(self) -> float | None:
+        """Share of 24h volume that happened in the last hour. None when 24h vol is zero."""
+        return (
+            self.volume_1h_usd / self.volume_24h_usd
+            if self.volume_24h_usd > 0
+            else None
+        )
+
+    @property
+    def liquidity_to_mcap(self) -> float:
+        """Liquidity depth relative to market cap (0.0 when mcap unknown)."""
+        return (
+            self.liquidity_usd / self.market_cap_usd if self.market_cap_usd > 0 else 0.0
+        )
+
+
+@dataclass
+class FilterResult:
+    """Outcome of evaluating one filter against a snapshot.
+
+    Mirrors ``fenrir/filters/market.py::MarketFilterResult`` (failures/warnings) so
+    the two subsystems read alike.
+    """
+
+    passed: bool
+    filter_name: str
+    token_address: str
+    chain: Chain
+    failures: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def __str__(self) -> str:
+        status = "PASS" if self.passed else "FAIL"
+        head = f"[{status}][{self.filter_name}] {self.token_address[:8]}…"
+        return f"{head} — {', '.join(self.failures)}" if self.failures else head
+
+
+@dataclass
+class ScoreBreakdown:
+    """Weighted 0–100 scores for a token."""
+
+    overall: float = 0.0
+    momentum: float = 0.0
+    safety: float = 0.0
+    liquidity: float = 0.0
+    holder: float = 0.0
+    community: float = 0.0
+    risk: float = 0.0  # 0 = safe, 100 = risky (inverse of the others)
+
+    def as_dict(self) -> dict[str, float]:
+        return {
+            "overall": round(self.overall, 1),
+            "momentum": round(self.momentum, 1),
+            "safety": round(self.safety, 1),
+            "liquidity": round(self.liquidity, 1),
+            "holder": round(self.holder, 1),
+            "community": round(self.community, 1),
+            "risk": round(self.risk, 1),
+        }
