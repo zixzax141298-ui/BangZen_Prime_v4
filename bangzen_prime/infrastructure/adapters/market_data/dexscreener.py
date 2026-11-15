@@ -1,37 +1,25 @@
-"""DexScreener adapter. Provides rich token snapshots for strategies."""
+"""DexScreener adapter for validated Solana market-pair snapshots."""
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
-from types import SimpleNamespace
+from decimal import Decimal, InvalidOperation
+from math import isfinite
 from typing import Any
 from urllib.parse import quote
 
-from bangzen_prime.domain.tokens import validate_chain, validate_mint
+from bangzen_prime.domain.tokens import PairSnapshot, validate_chain, validate_mint
+from bangzen_prime.errors import DomainError, ExternalServiceError
 from bangzen_prime.infrastructure.http import Transport, get_json
 from bangzen_prime.infrastructure.resilience.policies import ResilientCaller
 
-logger = logging.getLogger("bangzen_prime.dexscreener")
 SERVICE = "dexscreener"
 
 
-def _f(value: Any) -> float:
-    try:
-        return float(value) if value is not None else 0.0
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _i(value: Any) -> int:
-    try:
-        return int(value) if value is not None else 0
-    except (TypeError, ValueError):
-        return 0
-
-
 class DexScreenerAdapter:
+    """Fetch and normalize valid DEX pairs for one Solana mint."""
+
     def __init__(
         self,
         *,
@@ -47,75 +35,123 @@ class DexScreenerAdapter:
         self._timeout = timeout
         self._clock = clock
 
-    def fetch_rich_snapshot(self, chain: str, mint: str) -> Any | None:
-        """Mengambil data pasar lengkap (volume, txns, umur) untuk strategi."""
+    def fetch_pairs(self, chain: str, mint: str) -> list[PairSnapshot]:
         validate_chain(chain)
         validate_mint(mint)
-        url = f"{self._base}/tokens/{quote(mint, safe='')}"
 
-        try:
-            data = self._caller.call(
-                lambda: get_json(
-                    service=SERVICE,
-                    url=url,
-                    timeout=self._timeout,
-                    transport=self._transport,
-                )
-            )
-        except Exception as e:
-            logger.warning(f"DexScreener fetch failed for {mint[:8]}: {e}")
-            return None
-
-        pairs = data.get("pairs") if isinstance(data, dict) else None
-        if not pairs:
-            return None
-
-        # Pilih pair dengan likuiditas tertinggi
-        best = max(pairs, key=lambda p: _f((p.get("liquidity") or {}).get("usd")))
-        return self._parse_rich_pair(mint, best)
-
-    def _parse_rich_pair(self, mint: str, pair: dict[str, Any]) -> Any:
-        now = self._clock()
-        created_ms = pair.get("pairCreatedAt")
-        created_at = None
-        age_minutes = 0.0
-
-        if created_ms:
-            try:
-                created_at = datetime.fromtimestamp(created_ms / 1000, tz=UTC)
-                age_minutes = (now - created_at).total_seconds() / 60.0
-            except (OverflowError, OSError, ValueError):
-                pass
-
-        volume = pair.get("volume") or {}
-        txns = pair.get("txns") or {}
-        txns_5m = txns.get("m5") or {}
-        txns_1h = txns.get("h1") or {}
-        price_change = pair.get("priceChange") or {}
-        liquidity = pair.get("liquidity") or {}
-        info = pair.get("info") or {}
-
-        # Menggunakan SimpleNamespace sebagai "TokenSnapshot" agar tidak perlu ubah domain
-        return SimpleNamespace(
-            chain="solana",
-            token_address=mint,
-            symbol=(pair.get("baseToken") or {}).get("symbol", "???"),
-            name=(pair.get("baseToken") or {}).get("name", "Unknown"),
-            pair_address=pair.get("pairAddress"),
-            dex_id=pair.get("dexId"),
-            price_usd=_f(pair.get("priceUsd")),
-            market_cap_usd=_f(pair.get("marketCap")),
-            liquidity_usd=_f(liquidity.get("usd")),
-            volume_5m_usd=_f(volume.get("m5")),
-            volume_1h_usd=_f(volume.get("h1")),
-            volume_24h_usd=_f(volume.get("h24")),
-            txns_5m_buys=_i(txns_5m.get("buys")),
-            txns_5m_sells=_i(txns_5m.get("sells")),
-            txns_1h_buys=_i(txns_1h.get("buys")),
-            txns_1h_sells=_i(txns_1h.get("sells")),
-            price_change_5m_pct=_f(price_change.get("m5")),
-            price_change_1h_pct=_f(price_change.get("h1")),
-            price_change_24h_pct=_f(price_change.get("h24")),
-            created_at=created_at,
-            age_minutes=age_minutes,
+        url = (
+            f"{self._base}/token-pairs/v1/"
+            f"{quote(chain, safe='')}/{quote(mint, safe='')}"
         )
+        payload = self._caller.call(
+            lambda: get_json(
+                service=SERVICE,
+                url=url,
+                timeout=self._timeout,
+                transport=self._transport,
+            )
+        )
+
+        if not isinstance(payload, list):
+            raise ExternalServiceError(
+                "DexScreener returned an unexpected pair payload",
+                service=SERVICE,
+                retryable=False,
+            )
+
+        observed_at = self._clock()
+        if (
+            not isinstance(observed_at, datetime)
+            or observed_at.tzinfo is None
+            or observed_at.utcoffset() is None
+        ):
+            raise DomainError("DexScreener clock must be timezone-aware")
+
+        snapshots: list[PairSnapshot] = []
+
+        for raw in payload:
+            if not isinstance(raw, dict):
+                continue
+            if raw.get("chainId") != chain:
+                continue
+
+            base = raw.get("baseToken")
+            if not isinstance(base, dict) or base.get("address") != mint:
+                continue
+
+            try:
+                pair_address = self._required_text(raw.get("pairAddress"))
+                dex_id = self._required_text(raw.get("dexId"))
+                symbol = self._required_text(base.get("symbol"))
+
+                liquidity_data = raw.get("liquidity")
+                volume_data = raw.get("volume")
+                if not isinstance(liquidity_data, dict):
+                    continue
+                if not isinstance(volume_data, dict):
+                    continue
+
+                price = self._decimal(raw.get("priceUsd"))
+                liquidity = self._decimal(liquidity_data.get("usd"))
+                volume = self._decimal(volume_data.get("h24"))
+
+                if price <= 0 or liquidity < 0 or volume < 0:
+                    continue
+
+                snapshots.append(
+                    PairSnapshot.create(
+                        chain=chain,
+                        pair_address=pair_address,
+                        dex_id=dex_id,
+                        base_mint=mint,
+                        base_symbol=symbol,
+                        price_usd=price,
+                        liquidity_usd=liquidity,
+                        volume_24h_usd=volume,
+                        observed_at=observed_at,
+                        pair_created_at=self._created_at(
+                            raw.get("pairCreatedAt")
+                        ),
+                        source=SERVICE,
+                    )
+                )
+            except (
+                DomainError,
+                InvalidOperation,
+                TypeError,
+                ValueError,
+                OverflowError,
+            ):
+                # Skip one invalid pair without discarding other valid pairs.
+                continue
+
+        return snapshots
+
+    @staticmethod
+    def _required_text(value: Any) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("required text field is missing")
+        return value.strip()
+
+    @staticmethod
+    def _decimal(value: Any) -> Decimal:
+        if value is None or isinstance(value, bool):
+            raise InvalidOperation("missing or invalid decimal")
+        try:
+            result = Decimal(str(value).strip())
+        except (InvalidOperation, ValueError, AttributeError):
+            raise InvalidOperation("invalid decimal") from None
+        if not result.is_finite():
+            raise InvalidOperation("non-finite decimal")
+        return result
+
+    @staticmethod
+    def _created_at(value: Any) -> datetime | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        if isinstance(value, float) and not isfinite(value):
+            return None
+        try:
+            return datetime.fromtimestamp(value / 1000, tz=UTC)
+        except (OverflowError, OSError, ValueError):
+            return None

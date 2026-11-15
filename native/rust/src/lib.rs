@@ -40,3 +40,58 @@ fn bangzen_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(html_escape, m)?)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn min_out_amount_calculates_slippage_correctly() {
+        assert_eq!(min_out_amount(10_000, 100).unwrap(), 9_900);
+        assert_eq!(min_out_amount(10_000, 0).unwrap(), 10_000);
+        assert_eq!(min_out_amount(10_000, 10_000).unwrap(), 0);
+    }
+
+    #[test]
+    fn min_out_amount_rejects_slippage_above_limit() {
+        assert!(min_out_amount(10_000, 10_001).is_err());
+    }
+
+    #[test]
+    fn min_out_amount_rejects_overflow() {
+        assert!(min_out_amount(u64::MAX, 1).is_err());
+    }
+
+    #[test]
+    fn bundle_within_limits_accepts_valid_boundaries() {
+        assert!(bundle_within_limits(1, 100, 100));
+        assert!(bundle_within_limits(5, 100, 100));
+        assert!(bundle_within_limits(3, 0, 100));
+    }
+
+    #[test]
+    fn bundle_within_limits_rejects_invalid_transaction_counts() {
+        assert!(!bundle_within_limits(0, 0, 100));
+        assert!(!bundle_within_limits(6, 0, 100));
+    }
+
+    #[test]
+    fn bundle_within_limits_rejects_tip_above_cap() {
+        assert!(!bundle_within_limits(1, 101, 100));
+    }
+
+    #[test]
+    fn html_escape_handles_required_characters() {
+        assert_eq!(html_escape("&<>"), "&amp;&lt;&gt;");
+    }
+
+    #[test]
+    fn html_escape_handles_multiple_ampersands_safely() {
+        assert_eq!(html_escape("A & B && C"), "A &amp; B &amp;&amp; C");
+    }
+
+    #[test]
+    fn html_escape_preserves_unrelated_text() {
+        assert_eq!(html_escape("BANGZEN PRIME 2026"), "BANGZEN PRIME 2026");
+    }
+}

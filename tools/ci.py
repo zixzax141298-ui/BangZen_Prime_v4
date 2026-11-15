@@ -182,6 +182,28 @@ def run_check(check: Check, timeout: int, profile: str) -> dict[str, Any]:
 def evaluate_gate(
     profile: str, checks: list[Check], records: list[dict[str, Any]]
 ) -> tuple[str, str, bool]:
+    if profile not in ALL_PROFILES:
+        raise ValueError(f"Unsupported profile: {profile}")
+
+    if len(checks) != len(records):
+        raise ValueError("Check and record counts do not match")
+
+    valid_statuses = {"PASS", "FAIL", "BLOCKED", "NOT RUN"}
+
+    for check, record in zip(checks, records, strict=True):
+        if not isinstance(record, dict):
+            raise ValueError("Invalid check record")
+        if record.get("name") != check.name:
+            raise ValueError(
+                f"name mismatch: expected {check.name!r}, "
+                f"got {record.get('name')!r}"
+            )
+        status = record.get("status")
+        if not isinstance(status, str) or status not in valid_statuses:
+            raise ValueError(
+                f"Unknown status for {check.name}: {status!r}"
+            )
+
     applicable = [
         (check, record)
         for check, record in zip(checks, records, strict=True)

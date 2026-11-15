@@ -155,7 +155,6 @@ class TestEvaluateGate(unittest.TestCase):
         with self.assertRaises(ValueError):
             evaluate_gate("github", checks, records)
 
-    @unittest.skip("Dev mode")
     def test_mismatched_check_and_record_names_raise(self):
         checks = [
             self.make_check(name="compile"),
@@ -169,10 +168,44 @@ class TestEvaluateGate(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "name mismatch"):
             evaluate_gate("github", checks, records)
 
-    @unittest.skip("Dev mode")
     def test_missing_record_name_fails_closed(self):
         checks = [self.make_check(name="compile")]
         records = [{"status": "PASS"}]
+
+        with self.assertRaisesRegex(ValueError, "name mismatch"):
+            evaluate_gate("github", checks, records)
+
+
+    def test_unknown_status_fails_closed(self):
+        checks = [self.make_check()]
+        records = [{"name": "test", "status": "UNKNOWN"}]
+
+        with self.assertRaisesRegex(ValueError, "Unknown status"):
+            evaluate_gate("github", checks, records)
+
+    def test_unhashable_status_fails_closed(self):
+        checks = [self.make_check()]
+        records = [{"name": "test", "status": ["PASS"]}]
+
+        with self.assertRaisesRegex(ValueError, "Unknown status"):
+            evaluate_gate("github", checks, records)
+
+    def test_dictionary_status_fails_closed(self):
+        checks = [self.make_check()]
+        records = [{"name": "test", "status": {"value": "PASS"}}]
+
+        with self.assertRaisesRegex(ValueError, "Unknown status"):
+            evaluate_gate("github", checks, records)
+
+    def test_swapped_record_names_cannot_produce_green(self):
+        checks = [
+            self.make_check(name="compile"),
+            self.make_check(name="unit"),
+        ]
+        records = [
+            {"name": "unit", "status": "PASS"},
+            {"name": "compile", "status": "PASS"},
+        ]
 
         with self.assertRaisesRegex(ValueError, "name mismatch"):
             evaluate_gate("github", checks, records)
